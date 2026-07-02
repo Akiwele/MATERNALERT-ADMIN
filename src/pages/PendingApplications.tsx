@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { PendingApplicationDetails, formatDate } from '../components/ApplicationDetails';
 import { Badge } from '../components/ui/Badge';
@@ -10,13 +11,17 @@ import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { brand } from '../theme/brand';
+import { saveClinicActivationDemo } from '../utils/clinic-activation-demo';
 import type { ClinicApplication, DocumentType } from '../types';
 
 export function PendingApplications() {
+  const navigate = useNavigate();
   const { applications, approveApplication, rejectApplication } = useApp();
   const { showToast } = useToast();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [approveSuccessOpen, setApproveSuccessOpen] = useState(false);
+  const [approvedClinicEmail, setApprovedClinicEmail] = useState('');
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [documentView, setDocumentView] = useState<{
@@ -42,13 +47,24 @@ export function PendingApplications() {
       return;
     }
 
-    const result = approveApplication(selected.id);
+    const approvedApplication = selected;
+    const result = approveApplication(approvedApplication.id);
     setApproveConfirmOpen(false);
     setSelected(null);
 
     if (result) {
-      showToast('Clinic approved successfully. Activation link sent to official email.');
+      saveClinicActivationDemo({
+        email: approvedApplication.officialEmail,
+        facilityName: approvedApplication.facilityName,
+      });
+      setApprovedClinicEmail(approvedApplication.officialEmail);
+      setApproveSuccessOpen(true);
     }
+  };
+
+  const handleOpenActivationPage = () => {
+    setApproveSuccessOpen(false);
+    navigate('/clinic/activate');
   };
 
   const handleConfirmReject = () => {
@@ -120,6 +136,26 @@ export function PendingApplications() {
         onConfirm={handleConfirmApprove}
         onCancel={() => setApproveConfirmOpen(false)}
       />
+
+      <Modal
+        open={approveSuccessOpen}
+        title="Clinic Approved"
+        onClose={() => setApproveSuccessOpen(false)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleOpenActivationPage}>
+              Open Activation Page
+            </Button>
+            <Button onClick={() => setApproveSuccessOpen(false)}>Close</Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: '14px', color: brand.textSecondary, lineHeight: 1.6 }}>
+          The clinic has been approved successfully. An activation email has been sent to{' '}
+          <strong style={{ color: brand.text }}>{approvedClinicEmail}</strong>. The clinic
+          administrator can now activate the account and create a password.
+        </p>
+      </Modal>
 
       <ConfirmDialog
         open={rejectDialogOpen}

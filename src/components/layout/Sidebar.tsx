@@ -61,20 +61,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </NavLink>
         ))}
       </nav>
-
-      <div
-        style={{
-          marginTop: 'auto',
-          padding: '14px',
-          borderRadius: '12px',
-          backgroundColor: brand.primaryMuted,
-          fontSize: '13px',
-          color: brand.primaryDark,
-          lineHeight: 1.5,
-        }}
-      >
-        Review hospital applications, approve clinics, and monitor system activity.
-      </div>
     </aside>
   );
 }

@@ -1,5 +1,4 @@
 import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 
 import { Button } from '../components/ui/Button';
 import { FileUploadField } from '../components/ui/FileUploadField';
@@ -35,6 +34,16 @@ const createInitialForm = (): ApplicationFormState => ({
   declarationAccepted: false,
 });
 
+function handleAcknowledgeApplicationSuccess() {
+  window.close();
+
+  window.setTimeout(() => {
+    if (!window.closed) {
+      window.history.back();
+    }
+  }, 100);
+}
+
 export function HospitalApplicationForm() {
   const { submitApplication } = useApp();
   const [form, setForm] = useState<ApplicationFormState>(createInitialForm);
@@ -64,6 +73,8 @@ export function HospitalApplicationForm() {
     }
 
     const { declarationAccepted: _declaration, ...application } = form;
+    // TODO: When backend/Firebase is connected, submitted clinic applications should be saved to
+    // the database and appear automatically in the Admin Portal Pending Applications list.
     submitApplication(application);
     setSubmitted(true);
     handleClear();
@@ -91,10 +102,7 @@ export function HospitalApplicationForm() {
               marginTop: '28px',
             }}
           >
-            <Button onClick={() => setSubmitted(false)}>Submit Another Application</Button>
-            <Link to="/login" style={{ alignSelf: 'center', color: brand.primary, fontWeight: 600 }}>
-              Admin Login
-            </Link>
+            <Button onClick={handleAcknowledgeApplicationSuccess}>Okay</Button>
           </div>
         </div>
       </div>
@@ -109,9 +117,6 @@ export function HospitalApplicationForm() {
           <h1 style={{ margin: '16px 0 8px', color: brand.text, fontSize: '28px' }}>
             Facility Access Application
           </h1>
-          <p style={{ margin: 0, color: brand.textSecondary, fontSize: '15px', lineHeight: 1.6 }}>
-            Licensed health facilities can apply for access to MaternAlert.
-          </p>
         </div>
 
         <form key={formKey} onSubmit={handleSubmit} style={{ display: 'grid', gap: '28px' }}>
@@ -139,6 +144,7 @@ export function HospitalApplicationForm() {
                 <select
                   value={form.facilityType}
                   onChange={(event) => updateField('facilityType', event.target.value)}
+                  required
                   style={inputStyle}
                 >
                   {APPLICATION_FACILITY_TYPES.map((type) => (
@@ -157,6 +163,7 @@ export function HospitalApplicationForm() {
                 <select
                   value={form.region}
                   onChange={(event) => updateField('region', event.target.value)}
+                  required
                   style={inputStyle}
                 >
                   {GHANA_REGIONS.map((region) => (
@@ -305,7 +312,6 @@ function FormGrid({ children }: { children: ReactNode }) {
 
 function Field({
   label,
-  required,
   children,
   controlId,
 }: {

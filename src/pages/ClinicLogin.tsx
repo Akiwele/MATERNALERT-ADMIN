@@ -1,28 +1,31 @@
-import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useMemo, useState, type FormEvent } from 'react';
 
 import { AuthTextField } from '../components/auth/AuthTextField';
-import { useApp } from '../context/AppContext';
+import {
+  isClinicAccountActivatedDemo,
+  loadClinicActivationDemo,
+} from '../utils/clinic-activation-demo';
 
-export function AdminLogin() {
-  const navigate = useNavigate();
-  const { isAuthenticated, login } = useApp();
-  const [email, setEmail] = useState('admin@maternalert.com');
+export function ClinicLogin() {
+  const activationDemo = useMemo(() => loadClinicActivationDemo(), []);
+  const [email, setEmail] = useState(activationDemo.email);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
-  if (isAuthenticated) {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
+  const [infoMessage] = useState(() =>
+    isClinicAccountActivatedDemo()
+      ? 'Your clinic account has been activated successfully. You can now sign in.'
+      : '',
+  );
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const success = login(email, password);
-    if (success) {
-      navigate('/admin/dashboard');
+
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter your official email and password.');
       return;
     }
-    setError('Invalid email or password.');
+
+    setError('');
   };
 
   return (
@@ -30,16 +33,19 @@ export function AdminLogin() {
       <div className="auth-page-content">
         <header className="auth-header">
           <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-          <p className="auth-eyebrow">MaternAlert Admin</p>
-          <h1 className="auth-title">Welcome Back</h1>
+          <p className="auth-eyebrow">MaternAlert Clinic</p>
+          <h1 className="auth-title">Clinic Login</h1>
+          <p className="auth-subtitle">
+            Sign in to access your verified clinic dashboard and patient records.
+          </p>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-fields">
             <AuthTextField
-              label="Email Address"
+              label="Official Email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="clinic@example.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
@@ -63,6 +69,7 @@ export function AdminLogin() {
           </div>
 
           <div className="auth-actions">
+            {infoMessage ? <p className="clinic-login-info">{infoMessage}</p> : null}
             {error ? <p className="auth-form-error">{error}</p> : null}
 
             <button type="submit" className="auth-primary-button">

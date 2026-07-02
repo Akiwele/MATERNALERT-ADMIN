@@ -8,23 +8,22 @@ import { Sidebar } from './Sidebar';
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/admin/dashboard': {
     title: 'Dashboard',
-    subtitle: 'Overview of clinic applications and system activity.',
   },
   '/admin/pending': {
     title: 'Pending Clinic Applications',
-    subtitle: 'Review and process new hospital registration requests.',
+    
   },
   '/admin/approved': {
     title: 'Approved Clinics',
-    subtitle: 'Clinics that have been approved and activated.',
+    
   },
   '/admin/rejected': {
     title: 'Rejected Clinics',
-    subtitle: 'Applications that were not approved.',
+    
   },
   '/admin/logs': {
     title: 'System Logs',
-    subtitle: 'Audit trail of admin and application activity.',
+    
   },
 };
 

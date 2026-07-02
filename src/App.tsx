@@ -6,6 +6,8 @@ import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
 import { AdminLogin } from './pages/AdminLogin';
 import { ApprovedClinics } from './pages/ApprovedClinics';
+import { ClinicAccountActivation } from './pages/ClinicAccountActivation';
+import { ClinicLogin } from './pages/ClinicLogin';
 import { Dashboard } from './pages/Dashboard';
 import { HospitalApplicationForm } from './pages/HospitalApplicationForm';
 import { PendingApplications } from './pages/PendingApplications';
@@ -19,6 +21,8 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<AdminLogin />} />
         <Route path="/apply" element={<HospitalApplicationForm />} />
+        <Route path="/clinic/activate" element={<ClinicAccountActivation />} />
+        <Route path="/clinic-login" element={<ClinicLogin />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminShell />}>

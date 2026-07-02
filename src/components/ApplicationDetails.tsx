@@ -1,9 +1,8 @@
+import { SupportingDocumentsSection } from './SupportingDocumentsSection';
 import { brand } from '../theme/brand';
 import type { ClinicApplication } from '../types';
-import { Button } from './ui/Button';
 
-export function formatDate(value?: string) {
-  if (!value) {
+export function formatDate(value?: string) {  if (!value) {
     return '—';
   }
 
@@ -59,17 +58,7 @@ export function PendingApplicationDetails({
         <DetailField label="Submitted Date" value={formatDate(application.submittedAt)} />
       </div>
 
-      <div>
-        <p style={{ margin: '0 0 10px', fontSize: '12px', color: brand.textSecondary, fontWeight: 600 }}>
-          Supporting Documents
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          <Button variant="secondary" onClick={onViewDocument}>
-            View HeFRA Licence
-          </Button>
-        </div>
-      </div>
-    </div>
+      <SupportingDocumentsSection onViewDocument={onViewDocument} />    </div>
   );
 }
 
