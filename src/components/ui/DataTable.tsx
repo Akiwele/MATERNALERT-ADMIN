@@ -12,13 +12,57 @@ type DataTableProps<T> = {
   columns: Column<T>[];
   rows: T[];
   emptyMessage?: string;
+  loading?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 };
 
 export function DataTable<T extends { id: string }>({
   columns,
   rows,
   emptyMessage = 'No records found.',
+  loading = false,
+  errorMessage,
+  onRetry,
 }: DataTableProps<T>) {
+  if (loading || errorMessage) {
+    return (
+      <div
+        role={errorMessage ? 'alert' : 'status'}
+        style={{
+          display: 'grid',
+          justifyItems: 'center',
+          gap: '12px',
+          padding: '32px',
+          textAlign: 'center',
+          color: brand.textSecondary,
+          backgroundColor: brand.white,
+          border: `1px solid ${brand.border}`,
+          borderRadius: '14px',
+        }}
+      >
+        <span>{errorMessage ?? 'Loading clinic applications...'}</span>
+        {errorMessage && onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              padding: '9px 14px',
+              border: 0,
+              borderRadius: '8px',
+              color: brand.white,
+              backgroundColor: brand.primary,
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Try again
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (rows.length === 0) {
     return (
       <div

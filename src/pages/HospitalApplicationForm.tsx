@@ -1,8 +1,8 @@
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 
 import { Button } from '../components/ui/Button';
 import { FileUploadField } from '../components/ui/FileUploadField';
-import { useApp } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
 import { APPLICATION_FACILITY_TYPES, GHANA_REGIONS } from '../store/initialData';
 import { brand } from '../theme/brand';
 
@@ -34,6 +34,29 @@ const createInitialForm = (): ApplicationFormState => ({
   declarationAccepted: false,
 });
 
+function createTemporaryLicencePath(filename: string) {
+  const safeFilename = filename
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  // TODO: Replace this temporary placeholder with a real private Supabase Storage upload.
+  return `temporary-not-uploaded/${Date.now()}-${safeFilename || 'hefra-licence-document'}`;
+}
+
+function getErrorMessage(error: unknown) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+
+  return 'Unable to submit the application. Please try again.';
+}
+
 function handleAcknowledgeApplicationSuccess() {
   window.close();
 
@@ -45,10 +68,12 @@ function handleAcknowledgeApplicationSuccess() {
 }
 
 export function HospitalApplicationForm() {
-  const { submitApplication } = useApp();
   const [form, setForm] = useState<ApplicationFormState>(createInitialForm);
   const [formKey, setFormKey] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const submissionInFlight = useRef(false);
 
   const updateField = <K extends keyof ApplicationFormState>(
     field: K,
@@ -64,20 +89,87 @@ export function HospitalApplicationForm() {
   const handleClear = () => {
     setForm(createInitialForm());
     setFormKey((current) => current + 1);
+    setSubmissionError(null);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.declarationAccepted) {
+
+    if (submissionInFlight.current) {
       return;
     }
 
-    const { declarationAccepted: _declaration, ...application } = form;
-    // TODO: When backend/Firebase is connected, submitted clinic applications should be saved to
-    // the database and appear automatically in the Admin Portal Pending Applications list.
-    submitApplication(application);
-    setSubmitted(true);
-    handleClear();
+    const values = {
+      facilityName: form.facilityName.trim(),
+      hefraLicenceNumber: form.hefraLicenceNumber.trim(),
+      facilityType: form.facilityType.trim(),
+      region: form.region.trim(),
+      district: form.district.trim(),
+      officialEmail: form.officialEmail.trim(),
+      phoneNumber: form.phoneNumber.trim(),
+      contactPersonName: form.contactPersonName.trim(),
+      contactPersonRole: form.contactPersonRole.trim(),
+      hefraDocumentName: form.hefraDocumentName.trim(),
+    };
+
+    if (Object.values(values).some((value) => !value)) {
+      setSubmissionError('Please complete all required fields before submitting.');
+      return;
+    }
+
+    if (!form.declarationAccepted) {
+      setSubmissionError('Please accept the declaration before submitting.');
+      return;
+    }
+
+    submissionInFlight.current = true;
+    setIsSubmitting(true);
+    setSubmissionError(null);
+
+    try {
+      const { data: region, error: regionError } = await supabase
+        .from('regions')
+        .select('id')
+        .eq('name', values.region)
+        .maybeSingle();
+
+      if (regionError) {
+        throw new Error(`Unable to resolve the selected region: ${regionError.message}`);
+      }
+
+      if (!region) {
+        throw new Error(
+          'Unable to match the selected region to the database. Please try again later.',
+        );
+      }
+
+      const temporaryLicencePath = createTemporaryLicencePath(values.hefraDocumentName);
+      const { error } = await supabase.rpc('submit_clinic_application', {
+        p_facility_name: values.facilityName,
+        p_hefra_licence_number: values.hefraLicenceNumber,
+        p_facility_type: values.facilityType,
+        p_region_id: region.id,
+        p_district: values.district,
+        p_official_email: values.officialEmail,
+        p_official_phone: values.phoneNumber,
+        p_contact_person_name: values.contactPersonName,
+        p_contact_person_role: values.contactPersonRole,
+        p_licence_document_path: temporaryLicencePath,
+        p_terms_accepted: form.declarationAccepted,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSubmitted(true);
+      handleClear();
+    } catch (error) {
+      setSubmissionError(getErrorMessage(error));
+    } finally {
+      submissionInFlight.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -265,9 +357,17 @@ export function HospitalApplicationForm() {
             </span>
           </label>
 
+          {submissionError ? (
+            <p role="alert" style={{ margin: 0, color: brand.danger, fontSize: '14px' }}>
+              {submissionError}
+            </p>
+          ) : null}
+
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            <Button type="submit">Submit Application</Button>
-            <Button type="button" variant="secondary" onClick={handleClear}>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit Application'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleClear} disabled={isSubmitting}>
               Clear Form
             </Button>
           </div>

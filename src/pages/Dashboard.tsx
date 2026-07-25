@@ -7,7 +7,13 @@ import { useApp } from '../context/AppContext';
 import { brand } from '../theme/brand';
 
 export function Dashboard() {
-  const { applications, logs } = useApp();
+  const {
+    applications,
+    applicationsLoading,
+    applicationsError,
+    refreshApplications,
+    logs,
+  } = useApp();
 
   const pendingCount = applications.filter((item) => item.status === 'pending').length;
   const approvedCount = applications.filter((item) => item.status === 'approved').length;
@@ -41,6 +47,9 @@ export function Dashboard() {
         </div>
         <DataTable
           rows={recentApplications}
+          loading={applicationsLoading}
+          errorMessage={applicationsError}
+          onRetry={refreshApplications}
           emptyMessage="No applications yet."
           columns={[
             { key: 'facility', header: 'Facility', render: (row) => row.facilityName },

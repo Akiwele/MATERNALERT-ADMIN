@@ -9,6 +9,7 @@ export type ClinicApplication = {
   facilityName: string;
   hefraLicenceNumber: string;
   facilityType: string;
+  regionId?: number;
   region: string;
   district: string;
   officialEmail: string;
@@ -16,10 +17,15 @@ export type ClinicApplication = {
   contactPersonName: string;
   contactPersonRole: string;
   hefraDocumentName: string;
+  licenceDocumentPath?: string;
+  termsAccepted?: boolean;
   status: ApplicationStatus;
   submittedAt: string;
   reviewedAt?: string;
+  reviewNotes?: string;
   rejectionReason?: string;
+  invitationSentAt?: string;
+  activationCompletedAt?: string;
   activationToken?: string;
   accountStatus?: AccountStatus;
   activationStatus?: ActivationStatus;

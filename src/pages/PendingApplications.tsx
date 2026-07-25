@@ -16,7 +16,14 @@ import type { ClinicApplication, DocumentType } from '../types';
 
 export function PendingApplications() {
   const navigate = useNavigate();
-  const { applications, approveApplication, rejectApplication } = useApp();
+  const {
+    applications,
+    applicationsLoading,
+    applicationsError,
+    refreshApplications,
+    approveApplication,
+    rejectApplication,
+  } = useApp();
   const { showToast } = useToast();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
@@ -83,6 +90,9 @@ export function PendingApplications() {
     <div style={{ display: 'grid', gap: '16px' }}>
       <DataTable
         rows={pending}
+        loading={applicationsLoading}
+        errorMessage={applicationsError}
+        onRetry={refreshApplications}
         emptyMessage="No pending clinic applications."
         columns={[
           { key: 'facility', header: 'Facility Name', render: (row) => row.facilityName },

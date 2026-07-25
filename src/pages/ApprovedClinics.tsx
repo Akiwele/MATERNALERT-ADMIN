@@ -9,7 +9,12 @@ import { useApp } from '../context/AppContext';
 import type { ClinicApplication } from '../types';
 
 export function ApprovedClinics() {
-  const { applications } = useApp();
+  const {
+    applications,
+    applicationsLoading,
+    applicationsError,
+    refreshApplications,
+  } = useApp();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
   const approved = applications.filter((item) => item.status === 'approved');
 
@@ -17,6 +22,9 @@ export function ApprovedClinics() {
     <div>
       <DataTable
         rows={approved}
+        loading={applicationsLoading}
+        errorMessage={applicationsError}
+        onRetry={refreshApplications}
         emptyMessage="No approved clinics yet."
         columns={[
           { key: 'facility', header: 'Facility Name', render: (row) => row.facilityName },

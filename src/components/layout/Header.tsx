@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { useApp } from '../../context/AppContext';
 import { brand } from '../../theme/brand';
 import { Button } from '../ui/Button';
@@ -9,7 +12,18 @@ type HeaderProps = {
 };
 
 export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
-  const { logout } = useApp();
+  const navigate = useNavigate();
+  const { signOut } = useApp();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
 
   return (
     <header
@@ -52,8 +66,8 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <Button variant="secondary" onClick={logout}>
-        Logout
+      <Button variant="secondary" onClick={handleSignOut} disabled={isSigningOut}>
+        {isSigningOut ? 'Signing out...' : 'Logout'}
       </Button>
     </header>
   );

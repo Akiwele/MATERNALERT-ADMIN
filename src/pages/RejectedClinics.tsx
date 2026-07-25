@@ -9,7 +9,12 @@ import { useApp } from '../context/AppContext';
 import type { ClinicApplication } from '../types';
 
 export function RejectedClinics() {
-  const { applications } = useApp();
+  const {
+    applications,
+    applicationsLoading,
+    applicationsError,
+    refreshApplications,
+  } = useApp();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
   const rejected = applications.filter((item) => item.status === 'rejected');
 
@@ -17,6 +22,9 @@ export function RejectedClinics() {
     <div>
       <DataTable
         rows={rejected}
+        loading={applicationsLoading}
+        errorMessage={applicationsError}
+        onRetry={refreshApplications}
         emptyMessage="No rejected applications."
         columns={[
           { key: 'facility', header: 'Facility Name', render: (row) => row.facilityName },
