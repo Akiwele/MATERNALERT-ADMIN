@@ -6,10 +6,21 @@ type DocumentViewerModalProps = {
   open: boolean;
   title: string;
   fileName: string;
+  imageUrl?: string;
+  loading?: boolean;
+  errorMessage?: string;
   onClose: () => void;
 };
 
-export function DocumentViewerModal({ open, title, fileName, onClose }: DocumentViewerModalProps) {
+export function DocumentViewerModal({
+  open,
+  title,
+  fileName,
+  imageUrl,
+  loading = false,
+  errorMessage,
+  onClose,
+}: DocumentViewerModalProps) {
   return (
     <Modal
       open={open}
@@ -43,32 +54,42 @@ export function DocumentViewerModal({ open, title, fileName, onClose }: Document
               color: brand.primaryDark,
             }}
           >
-            Mock Document Preview
+            Protected Document Preview
           </div>
-          <div style={{ padding: '24px', minHeight: '280px' }}>
-            <div
-              style={{
-                width: '100%',
-                maxWidth: '420px',
-                margin: '0 auto',
-                backgroundColor: brand.white,
-                border: `1px solid ${brand.border}`,
-                borderRadius: '8px',
-                padding: '20px',
-                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
-              }}
-            >
-              <p style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 700, color: brand.text }}>
-                {title}
+          <div
+            style={{
+              display: 'grid',
+              placeItems: 'center',
+              padding: '24px',
+              minHeight: '280px',
+            }}
+          >
+            {loading ? (
+              <p role="status" style={{ margin: 0, color: brand.textSecondary }}>
+                Loading licence document...
               </p>
-              <p style={{ margin: '0 0 8px', fontSize: '13px', color: brand.textSecondary }}>
-                MaternAlert — Official Document Placeholder
+            ) : errorMessage ? (
+              <p role="alert" style={{ margin: 0, color: brand.danger }}>
+                {errorMessage}
               </p>
-              <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.7, color: brand.text }}>
-                This is a mock PDF preview for demonstration purposes. When Firebase storage is
-                connected, the uploaded document will open here for admin review.
+            ) : imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={title}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  maxWidth: '720px',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                }}
+              />
+            ) : (
+              <p style={{ margin: 0, color: brand.textSecondary }}>
+                The licence document is unavailable.
               </p>
-            </div>
+            )}
           </div>
         </div>
       </div>

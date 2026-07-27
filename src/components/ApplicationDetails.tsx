@@ -2,6 +2,7 @@ import { SupportingDocumentsSection } from './SupportingDocumentsSection';
 import { brand } from '../theme/brand';
 import type { ClinicApplication } from '../types';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function formatDate(value?: string) {  if (!value) {
     return '—';
   }
@@ -58,7 +59,11 @@ export function PendingApplicationDetails({
         <DetailField label="Submitted Date" value={formatDate(application.submittedAt)} />
       </div>
 
-      <SupportingDocumentsSection onViewDocument={onViewDocument} />    </div>
+      <SupportingDocumentsSection
+        onViewDocument={onViewDocument}
+        hasDocument={Boolean(application.licenceDocumentPath)}
+      />
+    </div>
   );
 }
 

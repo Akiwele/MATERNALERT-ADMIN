@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRef, useState } from 'react';
 
 import { PendingApplicationDetails, formatDate } from '../components/ApplicationDetails';
 import { Badge } from '../components/ui/Badge';
@@ -10,80 +9,134 @@ import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import {
+  approveClinicApplication,
+  getClinicLicenseDocumentUrl,
+  rejectClinicApplication,
+} from '../lib/clinicApplications';
 import { brand } from '../theme/brand';
-import { saveClinicActivationDemo } from '../utils/clinic-activation-demo';
-import type { ClinicApplication, DocumentType } from '../types';
+import type { ClinicApplication } from '../types';
 
 export function PendingApplications() {
-  const navigate = useNavigate();
   const {
     applications,
     applicationsLoading,
     applicationsError,
     refreshApplications,
-    approveApplication,
-    rejectApplication,
   } = useApp();
   const { showToast } = useToast();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
-  const [approveSuccessOpen, setApproveSuccessOpen] = useState(false);
-  const [approvedClinicEmail, setApprovedClinicEmail] = useState('');
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectionError, setRejectionError] = useState('');
+  const [processingAction, setProcessingAction] = useState<'approve' | 'reject' | null>(
+    null,
+  );
+  const actionInFlight = useRef(false);
   const [documentView, setDocumentView] = useState<{
-    type: DocumentType;
     fileName: string;
+    imageUrl?: string;
+    loading: boolean;
+    errorMessage?: string;
   } | null>(null);
 
   const pending = applications.filter((item) => item.status === 'pending');
+  const isProcessing = processingAction !== null;
 
-  const handleViewDocument = () => {
-    if (!selected) {
+  const handleViewDocument = async () => {
+    if (!selected?.licenceDocumentPath) {
       return;
     }
 
     setDocumentView({
-      type: 'hefra',
       fileName: selected.hefraDocumentName,
+      loading: true,
     });
+
+    try {
+      const imageUrl = await getClinicLicenseDocumentUrl(selected.id);
+      setDocumentView((current) =>
+        current ? { ...current, imageUrl, loading: false } : current,
+      );
+    } catch (error) {
+      setDocumentView((current) =>
+        current
+          ? {
+              ...current,
+              loading: false,
+              errorMessage:
+                error instanceof Error
+                  ? error.message
+                  : 'Unable to open the licence document. Please try again.',
+            }
+          : current,
+      );
+    }
   };
 
-  const handleConfirmApprove = () => {
-    if (!selected) {
+  const handleConfirmApprove = async () => {
+    if (!selected || actionInFlight.current) {
       return;
     }
 
-    const approvedApplication = selected;
-    const result = approveApplication(approvedApplication.id);
-    setApproveConfirmOpen(false);
-    setSelected(null);
+    actionInFlight.current = true;
+    setProcessingAction('approve');
 
-    if (result) {
-      saveClinicActivationDemo({
-        email: approvedApplication.officialEmail,
-        facilityName: approvedApplication.facilityName,
-      });
-      setApprovedClinicEmail(approvedApplication.officialEmail);
-      setApproveSuccessOpen(true);
+    try {
+      const result = await approveClinicApplication(selected.id);
+      await refreshApplications();
+      setApproveConfirmOpen(false);
+      setSelected(null);
+      showToast(
+        result.provisioningState === 'already_provisioned'
+          ? 'This clinic was already approved and provisioned.'
+          : result.invitationSent
+            ? 'Clinic approved, provisioned, and invited successfully.'
+            : 'Clinic provisioning resumed and completed successfully.',
+      );
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Unable to approve this clinic application.',
+        'error',
+      );
+    } finally {
+      actionInFlight.current = false;
+      setProcessingAction(null);
     }
   };
 
-  const handleOpenActivationPage = () => {
-    setApproveSuccessOpen(false);
-    navigate('/clinic/activate');
-  };
-
-  const handleConfirmReject = () => {
-    if (!selected) {
+  const handleConfirmReject = async () => {
+    if (!selected || actionInFlight.current) {
       return;
     }
 
-    rejectApplication(selected.id, rejectionReason);
-    setRejectDialogOpen(false);
-    setRejectionReason('');
-    setSelected(null);
-    showToast('Clinic application rejected.');
+    const trimmedReason = rejectionReason.trim();
+    if (!trimmedReason) {
+      setRejectionError('A rejection reason is required.');
+      return;
+    }
+
+    actionInFlight.current = true;
+    setRejectionError('');
+    setProcessingAction('reject');
+
+    try {
+      await rejectClinicApplication(selected.id, trimmedReason);
+      await refreshApplications();
+      setRejectDialogOpen(false);
+      setRejectionReason('');
+      setSelected(null);
+      showToast('Clinic application rejected successfully.');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Unable to reject this clinic application.',
+        'error',
+      );
+    } finally {
+      actionInFlight.current = false;
+      setProcessingAction(null);
+    }
   };
 
   return (
@@ -115,14 +168,31 @@ export function PendingApplications() {
       <Modal
         open={Boolean(selected)}
         title="Pending Application Details"
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          if (!isProcessing) {
+            setSelected(null);
+          }
+        }}
         footer={
           selected ? (
             <>
-              <Button variant="danger" onClick={() => setRejectDialogOpen(true)}>
+              <Button
+                variant="danger"
+                disabled={isProcessing}
+                onClick={() => {
+                  setRejectionReason('');
+                  setRejectionError('');
+                  setRejectDialogOpen(true);
+                }}
+              >
                 Reject Application
               </Button>
-              <Button onClick={() => setApproveConfirmOpen(true)}>Approve Clinic</Button>
+              <Button
+                disabled={isProcessing}
+                onClick={() => setApproveConfirmOpen(true)}
+              >
+                Approve Clinic
+              </Button>
             </>
           ) : null
         }
@@ -142,50 +212,44 @@ export function PendingApplications() {
         open={approveConfirmOpen}
         title="Approve Clinic"
         message="Are you sure you want to approve this clinic?"
-        confirmLabel="Approve Clinic"
+        confirmLabel={processingAction === 'approve' ? 'Approving...' : 'Approve Clinic'}
+        isProcessing={processingAction === 'approve'}
         onConfirm={handleConfirmApprove}
-        onCancel={() => setApproveConfirmOpen(false)}
+        onCancel={() => {
+          if (!isProcessing) {
+            setApproveConfirmOpen(false);
+          }
+        }}
       />
-
-      <Modal
-        open={approveSuccessOpen}
-        title="Clinic Approved"
-        onClose={() => setApproveSuccessOpen(false)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={handleOpenActivationPage}>
-              Open Activation Page
-            </Button>
-            <Button onClick={() => setApproveSuccessOpen(false)}>Close</Button>
-          </>
-        }
-      >
-        <p style={{ margin: 0, fontSize: '14px', color: brand.textSecondary, lineHeight: 1.6 }}>
-          The clinic has been approved successfully. An activation email has been sent to{' '}
-          <strong style={{ color: brand.text }}>{approvedClinicEmail}</strong>. The clinic
-          administrator can now activate the account and create a password.
-        </p>
-      </Modal>
 
       <ConfirmDialog
         open={rejectDialogOpen}
         title="Reject Application"
-        message="Optionally provide a reason for rejecting this clinic application."
-        confirmLabel="Confirm Rejection"
+        message="Provide a reason for rejecting this clinic application."
+        confirmLabel={processingAction === 'reject' ? 'Rejecting...' : 'Confirm Rejection'}
         confirmVariant="danger"
+        isProcessing={processingAction === 'reject'}
         onConfirm={handleConfirmReject}
         onCancel={() => {
+          if (isProcessing) {
+            return;
+          }
           setRejectDialogOpen(false);
           setRejectionReason('');
+          setRejectionError('');
         }}
       >
         <label style={{ display: 'grid', gap: '8px' }}>
           <span style={{ fontSize: '14px', fontWeight: 600, color: brand.text }}>
-            Rejection Reason (optional)
+            Rejection Reason
           </span>
           <textarea
             value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
+            onChange={(event) => {
+              setRejectionReason(event.target.value);
+              setRejectionError('');
+            }}
+            disabled={processingAction === 'reject'}
             rows={4}
             placeholder="Enter reason for rejection..."
             style={{
@@ -198,6 +262,11 @@ export function PendingApplications() {
               lineHeight: 1.5,
             }}
           />
+          {rejectionError ? (
+            <span role="alert" style={{ fontSize: '13px', color: brand.danger }}>
+              {rejectionError}
+            </span>
+          ) : null}
         </label>
       </ConfirmDialog>
 
@@ -205,6 +274,9 @@ export function PendingApplications() {
         open={Boolean(documentView)}
         title="HeFRA Licence Document"
         fileName={documentView?.fileName ?? ''}
+        imageUrl={documentView?.imageUrl}
+        loading={documentView?.loading}
+        errorMessage={documentView?.errorMessage}
         onClose={() => setDocumentView(null)}
       />
     </div>

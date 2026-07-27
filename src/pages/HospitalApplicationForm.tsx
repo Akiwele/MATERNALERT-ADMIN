@@ -1,10 +1,21 @@
-import { useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 
 import { Button } from '../components/ui/Button';
 import { FileUploadField } from '../components/ui/FileUploadField';
-import { supabase } from '../lib/supabase';
+import { submitClinicApplication } from '../lib/clinicApplications';
 import { APPLICATION_FACILITY_TYPES, GHANA_REGIONS } from '../store/initialData';
 import { brand } from '../theme/brand';
+
+const GHANA_PHONE_PATTERN = /^0\d{9}$/;
+const GHANA_PHONE_ERROR =
+  'Please enter a valid Ghanaian phone number: 10 digits starting with 0.';
 
 type ApplicationFormState = {
   facilityName: string;
@@ -33,16 +44,6 @@ const createInitialForm = (): ApplicationFormState => ({
   hefraDocumentName: '',
   declarationAccepted: false,
 });
-
-function createTemporaryLicencePath(filename: string) {
-  const safeFilename = filename
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  // TODO: Replace this temporary placeholder with a real private Supabase Storage upload.
-  return `temporary-not-uploaded/${Date.now()}-${safeFilename || 'hefra-licence-document'}`;
-}
 
 function getErrorMessage(error: unknown) {
   if (
@@ -73,7 +74,19 @@ export function HospitalApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [licenceFile, setLicenceFile] = useState<File | null>(null);
+  const [licencePreviewUrl, setLicencePreviewUrl] = useState('');
   const submissionInFlight = useRef(false);
+  const licencePreviewUrlRef = useRef('');
+
+  useEffect(
+    () => () => {
+      if (licencePreviewUrlRef.current) {
+        URL.revokeObjectURL(licencePreviewUrlRef.current);
+      }
+    },
+    [],
+  );
 
   const updateField = <K extends keyof ApplicationFormState>(
     field: K,
@@ -83,10 +96,26 @@ export function HospitalApplicationForm() {
   };
 
   const handleFileChange = (file?: File) => {
+    if (licencePreviewUrlRef.current) {
+      URL.revokeObjectURL(licencePreviewUrlRef.current);
+      licencePreviewUrlRef.current = '';
+    }
+
+    const previewUrl = file ? URL.createObjectURL(file) : '';
+    licencePreviewUrlRef.current = previewUrl;
+    setLicencePreviewUrl(previewUrl);
+    setLicenceFile(file ?? null);
     updateField('hefraDocumentName', file?.name ?? '');
+    setSubmissionError(null);
   };
 
   const handleClear = () => {
+    if (licencePreviewUrlRef.current) {
+      URL.revokeObjectURL(licencePreviewUrlRef.current);
+      licencePreviewUrlRef.current = '';
+    }
+    setLicencePreviewUrl('');
+    setLicenceFile(null);
     setForm(createInitialForm());
     setFormKey((current) => current + 1);
     setSubmissionError(null);
@@ -109,8 +138,12 @@ export function HospitalApplicationForm() {
       phoneNumber: form.phoneNumber.trim(),
       contactPersonName: form.contactPersonName.trim(),
       contactPersonRole: form.contactPersonRole.trim(),
-      hefraDocumentName: form.hefraDocumentName.trim(),
     };
+
+    if (!GHANA_PHONE_PATTERN.test(values.phoneNumber)) {
+      setSubmissionError(GHANA_PHONE_ERROR);
+      return;
+    }
 
     if (Object.values(values).some((value) => !value)) {
       setSubmissionError('Please complete all required fields before submitting.');
@@ -122,45 +155,41 @@ export function HospitalApplicationForm() {
       return;
     }
 
+    if (!licenceFile) {
+      setSubmissionError('Please select a HEFRA licence image before submitting.');
+      return;
+    }
+
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedImageTypes.includes(licenceFile.type)) {
+      setSubmissionError('The HEFRA licence image must be JPEG, PNG, or WEBP.');
+      return;
+    }
+
+    if (licenceFile.size > 5 * 1024 * 1024) {
+      setSubmissionError('The HEFRA licence image must be no larger than 5 MB.');
+      return;
+    }
+
     submissionInFlight.current = true;
     setIsSubmitting(true);
     setSubmissionError(null);
 
     try {
-      const { data: region, error: regionError } = await supabase
-        .from('regions')
-        .select('id')
-        .eq('name', values.region)
-        .maybeSingle();
+      const formData = new FormData();
+      formData.append('facility_name', values.facilityName);
+      formData.append('hefra_licence_number', values.hefraLicenceNumber);
+      formData.append('facility_type', values.facilityType);
+      formData.append('region', values.region);
+      formData.append('district', values.district);
+      formData.append('official_email', values.officialEmail);
+      formData.append('official_phone', values.phoneNumber);
+      formData.append('contact_person_name', values.contactPersonName);
+      formData.append('contact_person_role', values.contactPersonRole);
+      formData.append('terms_accepted', String(form.declarationAccepted));
+      formData.append('licence_image', licenceFile, licenceFile.name);
 
-      if (regionError) {
-        throw new Error(`Unable to resolve the selected region: ${regionError.message}`);
-      }
-
-      if (!region) {
-        throw new Error(
-          'Unable to match the selected region to the database. Please try again later.',
-        );
-      }
-
-      const temporaryLicencePath = createTemporaryLicencePath(values.hefraDocumentName);
-      const { error } = await supabase.rpc('submit_clinic_application', {
-        p_facility_name: values.facilityName,
-        p_hefra_licence_number: values.hefraLicenceNumber,
-        p_facility_type: values.facilityType,
-        p_region_id: region.id,
-        p_district: values.district,
-        p_official_email: values.officialEmail,
-        p_official_phone: values.phoneNumber,
-        p_contact_person_name: values.contactPersonName,
-        p_contact_person_role: values.contactPersonRole,
-        p_licence_document_path: temporaryLicencePath,
-        p_terms_accepted: form.declarationAccepted,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await submitClinicApplication(formData);
 
       setSubmitted(true);
       handleClear();
@@ -291,11 +320,14 @@ export function HospitalApplicationForm() {
               </Field>
               <Field label="Official Phone Number" required>
                 <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.phoneNumber}
                   onChange={(event) => updateField('phoneNumber', event.target.value)}
                   required
                   style={inputStyle}
-                  placeholder="+233 XX XXX XXXX"
+                  placeholder="0XXXXXXXXX"
                 />
               </Field>
               <Field label="Contact Person Name" required>
@@ -323,12 +355,29 @@ export function HospitalApplicationForm() {
             <Field label="Upload HeFRA Licence" required controlId="hefra-licence-upload">
               <FileUploadField
                 id="hefra-licence-upload"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                 required
                 value={form.hefraDocumentName}
                 buttonLabel="Upload Licence"
                 onChange={handleFileChange}
               />
+              {licencePreviewUrl ? (
+                <img
+                  src={licencePreviewUrl}
+                  alt="Selected HEFRA licence preview"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    maxWidth: '420px',
+                    maxHeight: '300px',
+                    marginTop: '12px',
+                    borderRadius: '10px',
+                    border: `1px solid ${brand.border}`,
+                    objectFit: 'contain',
+                    backgroundColor: brand.background,
+                  }}
+                />
+              ) : null}
             </Field>
           </FormSection>
 
@@ -365,7 +414,9 @@ export function HospitalApplicationForm() {
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Submitting...' : 'Submit Application'}
+              {isSubmitting
+                ? 'Submitting application and uploading licence...'
+                : 'Submit Application'}
             </Button>
             <Button type="button" variant="secondary" onClick={handleClear} disabled={isSubmitting}>
               Clear Form

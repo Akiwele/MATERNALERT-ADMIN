@@ -1,31 +1,77 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { LoaderCircle } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthTextField } from '../components/auth/AuthTextField';
-import {
-  isClinicAccountActivatedDemo,
-  loadClinicActivationDemo,
-} from '../utils/clinic-activation-demo';
+import { useClinicAuth } from '../context/ClinicAuthContext';
+
+type ClinicLoginLocationState = {
+  activationMessage?: string;
+};
 
 export function ClinicLogin() {
-  const activationDemo = useMemo(() => loadClinicActivationDemo(), []);
-  const [email, setEmail] = useState(activationDemo.email);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { clinic, authLoading, signIn } = useClinicAuth();
+  const activationMessage = (location.state as ClinicLoginLocationState | null)
+    ?.activationMessage;
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [infoMessage] = useState(() =>
-    isClinicAccountActivatedDemo()
-      ? 'Your clinic account has been activated successfully. You can now sign in.'
-      : '',
-  );
+  const [infoMessage, setInfoMessage] = useState(activationMessage ?? '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  if (authLoading) {
+    return (
+      <div className="auth-page">
+        <div className="auth-page-content" role="status" aria-live="polite">
+          <header className="auth-header">
+            <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
+            <p className="auth-eyebrow">MaternAlert Clinic</p>
+            <h1 className="auth-title">Checking Clinic Session</h1>
+            <p className="auth-subtitle">Please wait while we verify your access.</p>
+          </header>
+        </div>
+      </div>
+    );
+  }
+
+  if (clinic) {
+    return <Navigate to="/clinic" replace />;
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!email.trim() || !password.trim()) {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!email.trim() || !password) {
       setError('Please enter your official email and password.');
       return;
     }
 
     setError('');
+    setInfoMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const authenticatedClinic = await signIn(email, password);
+      setPassword('');
+      navigate('/clinic', {
+        replace: true,
+        state: { clinic: authenticatedClinic },
+      });
+    } catch (signInError) {
+      setError(
+        signInError instanceof Error
+          ? signInError.message
+          : 'Unable to sign in. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -36,44 +82,58 @@ export function ClinicLogin() {
           <p className="auth-eyebrow">MaternAlert Clinic</p>
           <h1 className="auth-title">Clinic Login</h1>
           <p className="auth-subtitle">
-            Sign in to access your verified clinic dashboard and patient records.
+            Sign in to access your verified clinic account.
           </p>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-fields">
             <AuthTextField
-              label="Official Email"
+              label="Official Clinic Email"
               type="email"
               placeholder="clinic@example.com"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setError('');
+              }}
               autoComplete="email"
+              disabled={isSubmitting}
               required
             />
 
-            <div className="auth-password-block">
-              <AuthTextField
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                isPassword
-                autoComplete="current-password"
-                required
-              />
-              <button type="button" className="auth-forgot-link">
-                Forgot Password?
-              </button>
-            </div>
+            <AuthTextField
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError('');
+              }}
+              isPassword
+              autoComplete="current-password"
+              disabled={isSubmitting}
+              required
+            />
           </div>
 
           <div className="auth-actions">
             {infoMessage ? <p className="clinic-login-info">{infoMessage}</p> : null}
             {error ? <p className="auth-form-error">{error}</p> : null}
 
-            <button type="submit" className="auth-primary-button">
-              Login
+            <button type="submit" className="auth-primary-button" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="auth-button-content">
+                  <LoaderCircle
+                    className="auth-button-spinner"
+                    size={18}
+                    aria-hidden="true"
+                  />
+                  Signing In...
+                </span>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </div>
         </form>

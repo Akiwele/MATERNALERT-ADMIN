@@ -9,4 +9,23 @@ if (!supabaseUrl || !supabasePublishableKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey);
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    // Invitation credentials are handled explicitly by the activation page so
+    // invalid and expired links can be reported consistently.
+    detectSessionInUrl: false,
+  },
+});
+
+// Clinic sessions use separate browser storage so the admin-only auth listener
+// cannot treat a valid clinic session as an unauthorized admin session.
+export const clinicSupabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+    storageKey: 'maternalert-clinic-auth',
+  },
+});

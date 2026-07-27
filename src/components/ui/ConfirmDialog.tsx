@@ -10,6 +10,7 @@ type ConfirmDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   confirmVariant?: 'primary' | 'danger';
+  isProcessing?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   children?: ReactNode;
@@ -22,6 +23,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   confirmVariant = 'primary',
+  isProcessing = false,
   onConfirm,
   onCancel,
   children,
@@ -31,7 +33,14 @@ export function ConfirmDialog({
   }
 
   return (
-    <div className="dialog-overlay" onClick={onCancel}>
+    <div
+      className="dialog-overlay"
+      onClick={() => {
+        if (!isProcessing) {
+          onCancel();
+        }
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -44,10 +53,10 @@ export function ConfirmDialog({
         </p>
         {children}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
-          <Button variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel} disabled={isProcessing}>
             {cancelLabel}
           </Button>
-          <Button variant={confirmVariant} onClick={onConfirm}>
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={isProcessing}>
             {confirmLabel}
           </Button>
         </div>

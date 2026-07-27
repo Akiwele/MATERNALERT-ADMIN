@@ -22,6 +22,7 @@ export type ClinicApplication = {
   status: ApplicationStatus;
   submittedAt: string;
   reviewedAt?: string;
+  reviewedBy?: string;
   reviewNotes?: string;
   rejectionReason?: string;
   invitationSentAt?: string;

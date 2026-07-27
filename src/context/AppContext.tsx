@@ -24,11 +24,6 @@ type StoredData = {
   logs?: SystemLog[];
 };
 
-type ApproveResult = {
-  email: string;
-  activationToken: string;
-};
-
 type SignInResult = {
   success: boolean;
   error?: string;
@@ -49,8 +44,6 @@ type AppContextValue = {
   signIn: (email: string, password: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   submitApplication: (input: ClinicApplicationInput) => void;
-  approveApplication: (id: string) => ApproveResult | null;
-  rejectApplication: (id: string, reason?: string) => void;
   getApplicationById: (id: string) => ClinicApplication | undefined;
 };
 
@@ -80,10 +73,6 @@ function createId(prefix: string) {
 
 function formatTimestamp(date = new Date()) {
   return date.toISOString();
-}
-
-function generateActivationToken() {
-  return `MAT-${Math.random().toString(36).slice(2, 10).toUpperCase()}-${Date.now().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
 async function verifyAdminProfile(userId: string) {
@@ -392,63 +381,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [addLog],
   );
 
-  const approveApplication = useCallback(
-    (id: string): ApproveResult | null => {
-      const application = applications.find((item) => item.id === id);
-      if (!application || application.status !== 'pending') {
-        return null;
-      }
-
-      const reviewedAt = formatTimestamp();
-      const activationToken = generateActivationToken();
-      setApplications((current) =>
-        current.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: 'approved',
-                reviewedAt,
-                activationToken,
-                accountStatus: 'Pending Activation',
-                activationStatus: 'Link Sent',
-              }
-            : item,
-        ),
-      );
-      addLog(
-        'Application Approved',
-        `${application.facilityName} was approved. Activation link sent to ${application.officialEmail}. Token: ${activationToken}`,
-      );
-
-      return { email: application.officialEmail, activationToken };
-    },
-    [addLog, applications],
-  );
-
-  const rejectApplication = useCallback(
-    (id: string, reason?: string) => {
-      const application = applications.find((item) => item.id === id);
-      if (!application || application.status !== 'pending') {
-        return;
-      }
-
-      const reviewedAt = formatTimestamp();
-      const rejectionReason = reason?.trim() || 'No reason provided.';
-      setApplications((current) =>
-        current.map((item) =>
-          item.id === id
-            ? { ...item, status: 'rejected', reviewedAt, rejectionReason }
-            : item,
-        ),
-      );
-      addLog(
-        'Application Rejected',
-        `${application.facilityName} application was rejected. Reason: ${rejectionReason}`,
-      );
-    },
-    [addLog, applications],
-  );
-
   const getApplicationById = useCallback(
     (id: string) => applications.find((item) => item.id === id),
     [applications],
@@ -470,8 +402,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       submitApplication,
-      approveApplication,
-      rejectApplication,
       getApplicationById,
     }),
     [
@@ -489,8 +419,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       submitApplication,
-      approveApplication,
-      rejectApplication,
       getApplicationById,
     ],
   );

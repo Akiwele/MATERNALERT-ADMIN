@@ -80,6 +80,7 @@ export function AuthTextField({
             type="button"
             className="auth-password-toggle"
             onClick={() => setVisible((current) => !current)}
+            disabled={inputProps.disabled}
             aria-label={visible ? 'Hide password' : 'Show password'}
           >
             <EyeIcon hidden={!visible} />
