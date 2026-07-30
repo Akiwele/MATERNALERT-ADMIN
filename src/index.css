@@ -503,6 +503,291 @@ select {
   }
 }
 
+.admin-login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(380px, 0.92fr) minmax(480px, 1.08fr);
+  overflow-x: hidden;
+  background: #f8fafc;
+}
+
+.admin-login-brand-panel {
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(40px, 6vw, 88px);
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 15% 18%, rgba(153, 246, 228, 0.2), transparent 34%),
+    linear-gradient(145deg, #064e4b 0%, #0f766e 54%, #115e59 100%);
+}
+
+.admin-login-brand-content {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 560px);
+  display: grid;
+  gap: clamp(52px, 8vh, 92px);
+}
+
+.admin-login-brand-logo {
+  width: clamp(96px, 9vw, 132px);
+  height: clamp(96px, 9vw, 132px);
+  object-fit: contain;
+  opacity: 1;
+  filter: brightness(0) invert(1);
+}
+
+.admin-login-brand-eyebrow,
+.admin-login-form-eyebrow {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-login-brand-eyebrow {
+  color: #ccfbf1;
+}
+
+.admin-login-brand-title {
+  max-width: 520px;
+  margin: 0;
+  font-size: clamp(36px, 4.1vw, 58px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: #ffffff;
+}
+
+.admin-login-brand-copy {
+  max-width: 510px;
+  margin: 24px 0 0;
+  font-size: clamp(16px, 1.45vw, 19px);
+  line-height: 1.7;
+  color: rgba(240, 253, 250, 0.84);
+}
+
+.admin-login-brand-footer {
+  position: relative;
+  z-index: 2;
+  margin: 48px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  color: rgba(204, 251, 241, 0.7);
+}
+
+.admin-login-brand-shape,
+.admin-login-brand-glow {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.admin-login-brand-shape {
+  border: 1px solid rgba(204, 251, 241, 0.15);
+  border-radius: 50%;
+}
+
+.admin-login-brand-shape-one {
+  width: 440px;
+  height: 440px;
+  right: -230px;
+  top: 6%;
+  box-shadow:
+    0 0 0 54px rgba(153, 246, 228, 0.035),
+    0 0 0 108px rgba(153, 246, 228, 0.025);
+}
+
+.admin-login-brand-shape-two {
+  width: 300px;
+  height: 300px;
+  left: -170px;
+  bottom: -110px;
+  background: rgba(153, 246, 228, 0.045);
+  box-shadow: 0 0 0 46px rgba(255, 255, 255, 0.025);
+}
+
+.admin-login-brand-glow {
+  width: 280px;
+  height: 280px;
+  right: 10%;
+  bottom: 7%;
+  border-radius: 42% 58% 58% 42% / 46% 42% 58% 54%;
+  background: linear-gradient(145deg, rgba(45, 212, 191, 0.16), rgba(255, 255, 255, 0.025));
+  transform: rotate(-18deg);
+  filter: blur(1px);
+}
+
+.admin-login-form-panel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(32px, 6vw, 88px);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(204, 251, 241, 0.45), transparent 28%),
+    #f8fafc;
+}
+
+.admin-login-form-shell {
+  width: min(100%, 460px);
+  padding: 0;
+}
+
+.admin-login-form-header {
+  margin-bottom: 34px;
+}
+
+.admin-login-form-logo-mark {
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  border-radius: 20px;
+  background: #0f766e;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.2);
+}
+
+.admin-login-form-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.admin-login-form-eyebrow {
+  color: #0f766e;
+}
+
+.admin-login-form-title {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 34px);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #172b2a;
+}
+
+.admin-login-form-subtitle {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.admin-login-form .auth-input {
+  min-height: 52px;
+  border-color: #cbd5e1;
+  border-radius: 12px;
+  box-shadow: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.admin-login-form .auth-input:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+
+.admin-login-form .auth-input:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+}
+
+.admin-login-form .auth-primary-button {
+  min-height: 52px;
+  border-radius: 12px;
+  background: #0f766e;
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.2);
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.admin-login-form .auth-primary-button:hover:not(:disabled) {
+  background: #0d6b64;
+  box-shadow: 0 12px 26px rgba(15, 118, 110, 0.25);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.admin-login-form .auth-primary-button:focus-visible {
+  outline: 3px solid #99f6e4;
+  outline-offset: 3px;
+}
+
+.admin-login-form .auth-forgot-link {
+  color: #0f766e;
+}
+
+.admin-login-loading-shell {
+  text-align: center;
+}
+
+.admin-login-loading-shell .admin-login-form-logo-mark {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .admin-login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-login-brand-panel {
+    display: none;
+  }
+
+  .admin-login-form-panel {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 40px 24px;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-login-form-panel {
+    align-items: flex-start;
+    padding: 24px 16px;
+  }
+
+  .admin-login-form-shell {
+    width: min(100%, 440px);
+  }
+
+  .admin-login-form-header {
+    margin-bottom: 28px;
+  }
+
+  .admin-login-form-logo-mark {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 18px;
+    border-radius: 18px;
+  }
+
+  .admin-login-form-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .admin-login-form-title {
+    font-size: 27px;
+  }
+}
+
 .login-page-inner {
   width: 100%;
   max-width: 440px;
@@ -800,12 +1085,12 @@ select {
   color: #0f766e;
 }
 
-.clinic-activation-security-note {
-  margin: 10px 0 0;
-  max-width: 360px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #6b7280;
+.clinic-activation-form-header {
+  margin-bottom: 24px;
+}
+
+.clinic-activation-form-header .auth-title {
+  margin-bottom: 0;
 }
 
 .clinic-activation-page-error {
@@ -821,13 +1106,21 @@ select {
   max-width: 480px;
 }
 
+.clinic-activation-success-header {
+  margin-bottom: 20px;
+}
+
+.clinic-activation-success-header .auth-logo {
+  margin-bottom: 0;
+}
+
 .clinic-activation-success-title-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .clinic-activation-success-title {
@@ -842,17 +1135,11 @@ select {
 }
 
 .clinic-activation-success-message {
-  display: grid;
-  gap: 14px;
-  margin-top: 20px;
-  font-size: 15px;
-  line-height: 1.65;
+  max-width: 440px;
+  margin: 20px 0 0;
   color: #6b7280;
-  text-align: center;
-}
-
-.clinic-activation-success-message p {
-  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .clinic-login-info {

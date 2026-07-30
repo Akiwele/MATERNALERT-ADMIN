@@ -155,9 +155,8 @@ export function ClinicAccountActivation() {
     return (
       <div className="auth-page">
         <div className="auth-page-content clinic-activation-success-page">
-          <header className="auth-header">
+          <header className="auth-header clinic-activation-success-header">
             <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-            <p className="auth-eyebrow">MaternAlert Clinic</p>
           </header>
 
           <div className="clinic-activation-success-title-row">
@@ -172,25 +171,10 @@ export function ClinicAccountActivation() {
             />
           </div>
 
-          <div className="clinic-activation-success-message">
-            <p>Your clinic account has been activated successfully and is ready to use.</p>
-            <p>You can now sign in using your official clinic email and new password.</p>
-          </div>
-
-          <button
-            type="button"
-            className="auth-primary-button"
-            onClick={() =>
-              navigate('/clinic-login', {
-                state: {
-                  activationMessage:
-                    'Your clinic account has been activated successfully. You can now sign in.',
-                },
-              })
-            }
-          >
-            Go to Clinic Login
-          </button>
+          <p className="clinic-activation-success-message">
+            You can now return to the MaternAlert mobile app and sign in using your official clinic
+            email address and the password you just created.
+          </p>
         </div>
       </div>
     );
@@ -199,17 +183,10 @@ export function ClinicAccountActivation() {
   return (
     <div className="auth-page">
       <div className="auth-page-content">
-        <header className="auth-header">
+        <header className="auth-header clinic-activation-form-header">
           <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
           <p className="auth-eyebrow">MaternAlert Clinic</p>
-          <h1 className="auth-title">Activate Your Clinic Account</h1>
-          <p className="auth-subtitle">
-            Your clinic application has been approved. Create your password to activate your
-            account.
-          </p>
-          <p className="clinic-activation-security-note">
-            For security reasons, only approved clinics can activate their accounts.
-          </p>
+          <h1 className="auth-title">Create Your Password</h1>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">
