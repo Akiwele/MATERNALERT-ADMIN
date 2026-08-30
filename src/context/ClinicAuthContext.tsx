@@ -11,23 +11,32 @@ import {
 
 import {
   restoreClinicSession,
+  resumeClinicAccountActivation,
   signInClinic,
   type AuthenticatedClinic,
+  type IncompleteClinicActivation,
 } from '../lib/clinicAuth';
 import { clinicSupabase } from '../lib/supabase';
 
 type ClinicAuthContextValue = {
   clinic: AuthenticatedClinic | null;
+  activationIncomplete: IncompleteClinicActivation | null;
   authLoading: boolean;
-  signIn: (email: string, password: string) => Promise<AuthenticatedClinic>;
+  signIn: (email: string, password: string) => Promise<
+    | { status: 'active'; clinic: AuthenticatedClinic }
+    | { status: 'activation_incomplete'; clinic: IncompleteClinicActivation }
+  >;
+  completeResumedActivation: () => Promise<AuthenticatedClinic>;
   signOut: () => Promise<void>;
 };
 
 const ClinicAuthContext = createContext<ClinicAuthContextValue | null>(null);
 
 export function ClinicAuthProvider({ children }: { children: ReactNode }) {
-  const restorePromise = useRef<Promise<AuthenticatedClinic | null> | null>(null);
+  const restorePromise = useRef<ReturnType<typeof restoreClinicSession> | null>(null);
   const [clinic, setClinic] = useState<AuthenticatedClinic | null>(null);
+  const [activationIncomplete, setActivationIncomplete] =
+    useState<IncompleteClinicActivation | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
@@ -39,11 +48,23 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     void pendingRestore
-      .then((restoredClinic) => {
-        if (active) {
-          setClinic(restoredClinic);
-          setAuthLoading(false);
+      .then((inspection) => {
+        if (!active) {
+          return;
         }
+
+        if (inspection.status === 'active') {
+          setClinic(inspection.clinic);
+          setActivationIncomplete(null);
+        } else if (inspection.status === 'activation_incomplete') {
+          setClinic(null);
+          setActivationIncomplete(inspection.clinic);
+        } else {
+          setClinic(null);
+          setActivationIncomplete(null);
+        }
+
+        setAuthLoading(false);
       })
       .catch(async () => {
         try {
@@ -51,6 +72,7 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
         } finally {
           if (active) {
             setClinic(null);
+            setActivationIncomplete(null);
             setAuthLoading(false);
           }
         }
@@ -61,6 +83,7 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
     } = clinicSupabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT' && active) {
         setClinic(null);
+        setActivationIncomplete(null);
       }
     });
 
@@ -71,9 +94,28 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const authenticatedClinic = await signInClinic(email, password);
-    setClinic(authenticatedClinic);
-    return authenticatedClinic;
+    const inspection = await signInClinic(email, password);
+
+    if (inspection.status === 'active') {
+      setClinic(inspection.clinic);
+      setActivationIncomplete(null);
+      return inspection;
+    }
+
+    if (inspection.status === 'activation_incomplete') {
+      setClinic(null);
+      setActivationIncomplete(inspection.clinic);
+      return inspection;
+    }
+
+    throw new Error('Unable to verify clinic access. Please try again.');
+  }, []);
+
+  const completeResumedActivation = useCallback(async () => {
+    const activatedClinic = await resumeClinicAccountActivation();
+    setClinic(activatedClinic);
+    setActivationIncomplete(null);
+    return activatedClinic;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -81,17 +123,20 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
       await clinicSupabase.auth.signOut();
     } finally {
       setClinic(null);
+      setActivationIncomplete(null);
     }
   }, []);
 
   const value = useMemo(
     () => ({
       clinic,
+      activationIncomplete,
       authLoading,
       signIn,
+      completeResumedActivation,
       signOut,
     }),
-    [authLoading, clinic, signIn, signOut],
+    [activationIncomplete, authLoading, clinic, completeResumedActivation, signIn, signOut],
   );
 
   return <ClinicAuthContext.Provider value={value}>{children}</ClinicAuthContext.Provider>;

@@ -122,12 +122,12 @@ export function PendingApplications() {
     setProcessingAction('reject');
 
     try {
-      await rejectClinicApplication(selected.id, trimmedReason);
+      const result = await rejectClinicApplication(selected.id, trimmedReason);
       await refreshApplications();
       setRejectDialogOpen(false);
       setRejectionReason('');
       setSelected(null);
-      showToast('Clinic application rejected successfully.');
+      showToast(result.message, result.emailSent ? 'success' : 'error');
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : 'Unable to reject this clinic application.',

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
+import { MaternAlertBrand } from '../MaternAlertBrand';
 import { brand } from '../../theme/brand';
 
 const navItems = [
@@ -25,19 +26,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       }}
     >
       <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '12px',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: brand.primary,
-          }}
-        >
-          MaternAlert
-        </p>
-        <h1 style={{ margin: '6px 0 0', fontSize: '22px', color: brand.text }}>Admin Portal</h1>
+        <MaternAlertBrand layout="inline" size="sm" badge="Admin" />
+        <h1 style={{ margin: '10px 0 0', fontSize: '22px', color: brand.text }}>Admin Portal</h1>
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

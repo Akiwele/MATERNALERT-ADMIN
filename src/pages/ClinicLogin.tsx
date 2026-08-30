@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthTextField } from '../components/auth/AuthTextField';
+import { MaternAlertBrand } from '../components/MaternAlertBrand';
 import { useClinicAuth } from '../context/ClinicAuthContext';
 
 type ClinicLoginLocationState = {
@@ -12,7 +13,7 @@ type ClinicLoginLocationState = {
 export function ClinicLogin() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clinic, authLoading, signIn } = useClinicAuth();
+  const { clinic, activationIncomplete, authLoading, signIn } = useClinicAuth();
   const activationMessage = (location.state as ClinicLoginLocationState | null)
     ?.activationMessage;
   const [email, setEmail] = useState('');
@@ -26,8 +27,7 @@ export function ClinicLogin() {
       <div className="auth-page">
         <div className="auth-page-content" role="status" aria-live="polite">
           <header className="auth-header">
-            <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-            <p className="auth-eyebrow">MaternAlert Clinic</p>
+            <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
             <h1 className="auth-title">Checking Clinic Session</h1>
             <p className="auth-subtitle">Please wait while we verify your access.</p>
           </header>
@@ -38,6 +38,10 @@ export function ClinicLogin() {
 
   if (clinic) {
     return <Navigate to="/clinic" replace />;
+  }
+
+  if (activationIncomplete) {
+    return <Navigate to="/clinic/resume-activation" replace />;
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -57,11 +61,11 @@ export function ClinicLogin() {
     setIsSubmitting(true);
 
     try {
-      const authenticatedClinic = await signIn(email, password);
+      const result = await signIn(email, password);
       setPassword('');
-      navigate('/clinic', {
+      navigate(result.status === 'activation_incomplete' ? '/clinic/resume-activation' : '/clinic', {
         replace: true,
-        state: { clinic: authenticatedClinic },
+        state: result.status === 'active' ? { clinic: result.clinic } : undefined,
       });
     } catch (signInError) {
       setError(
@@ -78,8 +82,7 @@ export function ClinicLogin() {
     <div className="auth-page">
       <div className="auth-page-content">
         <header className="auth-header">
-          <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-          <p className="auth-eyebrow">MaternAlert Clinic</p>
+          <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
           <h1 className="auth-title">Clinic Login</h1>
           <p className="auth-subtitle">
             Sign in to access your verified clinic account.

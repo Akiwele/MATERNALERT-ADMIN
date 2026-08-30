@@ -3,10 +3,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AuthTextField } from '../components/auth/AuthTextField';
+import { MaternAlertBrand } from '../components/MaternAlertBrand';
 import {
   activateClinicAccount,
   ClinicInvitationError,
   initializeClinicInvitation,
+  isClinicActivationRpcError,
+  retryClinicAccountActivation,
   type ClinicActivationContext,
   validateClinicPassword,
 } from '../lib/clinicAuth';
@@ -33,6 +36,8 @@ export function ClinicAccountActivation() {
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRetryingActivation, setIsRetryingActivation] = useState(false);
+  const [canRetryActivation, setCanRetryActivation] = useState(false);
   const [isActivated, setIsActivated] = useState(false);
 
   useEffect(() => {
@@ -101,12 +106,38 @@ export function ClinicAccountActivation() {
       await supabase.auth.signOut();
       setPassword('');
       setConfirmPassword('');
+      setCanRetryActivation(false);
       setIsActivated(true);
     } catch (error) {
       console.error('Clinic activation failed:', error);
+      setCanRetryActivation(isClinicActivationRpcError(error));
       setSubmitError(getActivationErrorMessage(error));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryActivation = async () => {
+    if (isRetryingActivation) {
+      return;
+    }
+
+    setIsRetryingActivation(true);
+    setSubmitError('');
+
+    try {
+      await retryClinicAccountActivation();
+      await supabase.auth.signOut();
+      setPassword('');
+      setConfirmPassword('');
+      setCanRetryActivation(false);
+      setIsActivated(true);
+    } catch (error) {
+      console.error('Clinic activation retry failed:', error);
+      setCanRetryActivation(true);
+      setSubmitError(getActivationErrorMessage(error));
+    } finally {
+      setIsRetryingActivation(false);
     }
   };
 
@@ -115,8 +146,7 @@ export function ClinicAccountActivation() {
       <div className="auth-page">
         <div className="auth-page-content">
           <header className="auth-header">
-            <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-            <p className="auth-eyebrow">MaternAlert Clinic</p>
+            <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
             <h1 className="auth-title">Checking Your Invitation</h1>
             <p className="auth-subtitle">
               Please wait while we securely verify your clinic account.
@@ -132,8 +162,7 @@ export function ClinicAccountActivation() {
       <div className="auth-page">
         <div className="auth-page-content">
           <header className="auth-header">
-            <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-            <p className="auth-eyebrow">MaternAlert Clinic</p>
+            <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
             <h1 className="auth-title">Unable to Open Invitation</h1>
             <p className="auth-form-error clinic-activation-page-error">{loadError}</p>
             {loadErrorAllowsClinicLogin ? (
@@ -156,7 +185,7 @@ export function ClinicAccountActivation() {
       <div className="auth-page">
         <div className="auth-page-content clinic-activation-success-page">
           <header className="auth-header clinic-activation-success-header">
-            <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
+            <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
           </header>
 
           <div className="clinic-activation-success-title-row">
@@ -184,9 +213,10 @@ export function ClinicAccountActivation() {
     <div className="auth-page">
       <div className="auth-page-content">
         <header className="auth-header clinic-activation-form-header">
-          <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-          <p className="auth-eyebrow">MaternAlert Clinic</p>
-          <h1 className="auth-title">Create Your Password</h1>
+          <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
+          <h1 className="auth-title">
+            {canRetryActivation ? 'Finish Clinic Activation' : 'Create Your Password'}
+          </h1>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -204,42 +234,57 @@ export function ClinicAccountActivation() {
 
             <p className="clinic-activation-facility">{clinic?.clinicName}</p>
 
-            <AuthTextField
-              label="Create Password"
-              placeholder="Enter a secure password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                setPasswordError('');
-                setSubmitError('');
-              }}
-              isPassword
-              autoComplete="new-password"
-              error={passwordError}
-              required
-            />
+            {canRetryActivation ? null : (
+              <>
+                <AuthTextField
+                  label="Create Password"
+                  placeholder="Enter a secure password"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setPasswordError('');
+                    setSubmitError('');
+                  }}
+                  isPassword
+                  autoComplete="new-password"
+                  error={passwordError}
+                  required
+                />
 
-            <AuthTextField
-              label="Confirm Password"
-              placeholder="Re-enter your password"
-              value={confirmPassword}
-              onChange={(event) => {
-                setConfirmPassword(event.target.value);
-                setConfirmPasswordError('');
-                setSubmitError('');
-              }}
-              isPassword
-              autoComplete="new-password"
-              error={confirmPasswordError}
-              required
-            />
+                <AuthTextField
+                  label="Confirm Password"
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(event) => {
+                    setConfirmPassword(event.target.value);
+                    setConfirmPasswordError('');
+                    setSubmitError('');
+                  }}
+                  isPassword
+                  autoComplete="new-password"
+                  error={confirmPasswordError}
+                  required
+                />
+              </>
+            )}
           </div>
 
           <div className="auth-actions">
             {submitError ? <p className="auth-form-error">{submitError}</p> : null}
-            <button type="submit" className="auth-primary-button" disabled={isSubmitting}>
-              {isSubmitting ? 'Activating...' : 'Activate Account'}
-            </button>
+            {canRetryActivation ? (
+              <button
+                type="button"
+                className="auth-primary-button"
+                onClick={() => void handleRetryActivation()}
+                disabled={isRetryingActivation}
+              >
+                {isRetryingActivation ? 'Retrying Activation...' : 'Retry Activation'}
+              </button>
+            ) : (
+              <button type="submit" className="auth-primary-button" disabled={isSubmitting}>
+                {isSubmitting ? 'Activating...' : 'Activate Account'}
+              </button>
+            )}
           </div>
         </form>
       </div>

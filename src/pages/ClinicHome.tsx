@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { MaternAlertBrand } from '../components/MaternAlertBrand';
 import { useClinicAuth } from '../context/ClinicAuthContext';
 
 export function ClinicHome() {
@@ -25,8 +26,7 @@ export function ClinicHome() {
     <div className="auth-page">
       <main className="auth-page-content clinic-activation-success-page">
         <header className="auth-header">
-          <img src="/maternalert-logo.png" alt="MaternAlert" className="auth-logo" />
-          <p className="auth-eyebrow">MaternAlert Clinic</p>
+          <MaternAlertBrand layout="stacked" size="lg" badge="Clinic" />
           <h1 className="auth-title">{clinic?.clinicName}</h1>
           <p className="auth-subtitle">
             You are securely signed in to your active clinic account.

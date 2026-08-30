@@ -88,6 +88,7 @@ export function ApprovedClinicDetails({ application }: ApprovedClinicDetailsProp
       <DetailField label="Contact Person Name" value={application.contactPersonName} />
       <DetailField label="Contact Person Role" value={application.contactPersonRole} />
       <DetailField label="Region" value={application.region} />
+      <DetailField label="District" value={application.district} />
       <DetailField label="Date Approved" value={formatDate(application.reviewedAt)} />
       <DetailField label="Account Status" value={application.accountStatus ?? 'Pending Activation'} />
       <DetailField label="Activation Status" value={application.activationStatus ?? 'Link Sent'} />
@@ -119,10 +120,23 @@ export function RejectedClinicDetails({ application }: RejectedClinicDetailsProp
       <DetailField label="Contact Person Name" value={application.contactPersonName} />
       <DetailField label="Contact Person Role" value={application.contactPersonRole} />
       <DetailField label="Region" value={application.region} />
+      <DetailField label="District" value={application.district} />
       <DetailField label="Date Rejected" value={formatDate(application.reviewedAt)} />
       <DetailField
         label="Rejection Reason"
         value={application.rejectionReason?.trim() || 'No reason provided.'}
+      />
+      <DetailField
+        label="Email Status"
+        value={
+          application.rejectionEmailStatus === 'sent'
+            ? 'Rejected and email sent'
+            : application.rejectionEmailStatus === 'failed'
+              ? 'Rejected but email failed'
+              : application.rejectionEmailStatus === 'processing'
+                ? 'Rejection email is sending'
+                : 'Rejection email not sent'
+        }
       />
     </div>
   );

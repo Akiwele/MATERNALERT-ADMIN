@@ -1,5 +1,9 @@
-import type { User } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 
+import {
+  classifyClinicAccess,
+  clinicAccessErrorMessage,
+} from './clinicAccess';
 import { clinicSupabase, supabase } from './supabase';
 
 export type ClinicActivationContext = {
@@ -14,6 +18,33 @@ export type ClinicActivationContext = {
 export type AuthenticatedClinic = {
   clinicName: string;
 };
+
+export type IncompleteClinicActivation = {
+  clinicName: string;
+  officialEmail: string;
+};
+
+export type ClinicSessionInspection =
+  | { status: 'none' }
+  | { status: 'active'; clinic: AuthenticatedClinic }
+  | { status: 'activation_incomplete'; clinic: IncompleteClinicActivation };
+
+export class ClinicInvitationError extends Error {}
+
+export class ClinicActivationRpcError extends Error {
+  readonly code = 'activation_rpc_failed' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ClinicActivationRpcError';
+  }
+}
+
+export function isClinicActivationRpcError(
+  error: unknown,
+): error is ClinicActivationRpcError {
+  return error instanceof ClinicActivationRpcError;
+}
 
 type ClinicActivationContextRow = {
   clinic_id: string;
@@ -33,8 +64,6 @@ type InvitationParameters = {
   errorCode: string | null;
   errorDescription: string | null;
 };
-
-export class ClinicInvitationError extends Error {}
 
 function lostInvitationSessionError(): ClinicInvitationError {
   return new ClinicInvitationError(
@@ -87,8 +116,11 @@ function toActivationContext(row: ClinicActivationContextRow): ClinicActivationC
   };
 }
 
-async function loadClinicActivationContext(user: User): Promise<ClinicActivationContext> {
-  const { data, error } = await supabase.rpc('get_clinic_activation_context');
+async function loadClinicActivationContext(
+  client: SupabaseClient,
+  user: User,
+): Promise<ClinicActivationContext> {
+  const { data, error } = await client.rpc('get_clinic_activation_context');
   const row = (data as ClinicActivationContextRow[] | null)?.[0];
 
   if (error || !row) {
@@ -255,7 +287,7 @@ export async function initializeClinicInvitation(): Promise<ClinicActivationCont
   }
 
   try {
-    const context = await loadClinicActivationContext(data.user);
+    const context = await loadClinicActivationContext(supabase, data.user);
     const { data: postContextSessionData, error: postContextSessionError } =
       await supabase.auth.getSession();
     console.log('Clinic invitation session after activation context load', {
@@ -293,6 +325,64 @@ export function validateClinicPassword(password: string): string {
   return '';
 }
 
+async function completeClinicActivationWith(
+  client: SupabaseClient,
+): Promise<AuthenticatedClinic> {
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError || !userData.user) {
+    throw new Error('Your clinic session expired. Please sign in again.');
+  }
+
+  const { data: profile, error: profileError } = await client
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+
+  if (profileError || profile?.role !== 'clinic') {
+    throw new Error('This account is not authorized for clinic access.');
+  }
+
+  const context = await loadClinicActivationContext(client, userData.user);
+  const classification = classifyClinicAccess({
+    profileRole: profile.role,
+    userEmail: userData.user.email,
+    context: {
+      officialEmail: context.officialEmail,
+      isActive: context.isActive,
+      activatedAt: context.activatedAt,
+      activationCompletedAt: context.activationCompletedAt,
+    },
+  });
+
+  if (classification === 'active') {
+    return { clinicName: context.clinicName };
+  }
+
+  if (classification !== 'activation_incomplete') {
+    throw new Error(clinicAccessErrorMessage(classification));
+  }
+
+  const { data, error } = await client.rpc('complete_clinic_account_activation');
+  const activation = (
+    data as
+      | Array<{
+          clinic_id: string;
+          is_active: boolean;
+          activated_at: string | null;
+        }>
+      | null
+  )?.[0];
+
+  if (error || !activation?.is_active || !activation.activated_at) {
+    throw new ClinicActivationRpcError(
+      'Clinic activation could not be completed. Please try again or contact the MaternAlert administrator.',
+    );
+  }
+
+  return { clinicName: context.clinicName };
+}
+
 export async function activateClinicAccount(password: string): Promise<void> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   console.log('Clinic activation: session available', Boolean(sessionData.session));
@@ -310,91 +400,122 @@ export async function activateClinicAccount(password: string): Promise<void> {
     throw new Error(passwordError.message);
   }
 
-  // Keep the valid invitation session available when this RPC fails. Retrying
-  // safely repeats the password update before the idempotent database call.
   console.log('Clinic activation: calling activation RPC');
-  const { data, error } = await supabase.rpc('complete_clinic_account_activation');
-  console.log('Clinic activation: RPC data', data);
-  console.log('Clinic activation: RPC error', error);
+  try {
+    await completeClinicActivationWith(supabase);
+  } catch (error) {
+    if (isClinicActivationRpcError(error)) {
+      throw new ClinicActivationRpcError(
+        'Your password was saved, but clinic activation could not be completed. Use Retry Activation to finish without creating another password.',
+      );
+    }
 
-  const activation = (
-    data as
-      | Array<{
-          clinic_id: string;
-          is_active: boolean;
-          activated_at: string | null;
-        }>
-      | null
-  )?.[0];
-
-  if (error || !activation?.is_active || !activation.activated_at) {
-    throw new Error(
-      'Your password was saved, but clinic activation could not be completed. Please try again or contact the MaternAlert administrator.',
-    );
+    throw error;
   }
 }
 
-async function validateAuthenticatedClinic(user: User): Promise<AuthenticatedClinic> {
-  const { data: profile, error: profileError } = await clinicSupabase
+export async function retryClinicAccountActivation(): Promise<void> {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    throw lostInvitationSessionError();
+  }
+
+  await completeClinicActivationWith(supabase);
+}
+
+export async function resumeClinicAccountActivation(): Promise<AuthenticatedClinic> {
+  return completeClinicActivationWith(clinicSupabase);
+}
+
+async function inspectAuthenticatedClinic(
+  client: SupabaseClient,
+  user: User,
+): Promise<ClinicSessionInspection> {
+  const { data: profile, error: profileError } = await client
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .maybeSingle();
 
-  const { data: clinic, error: clinicError } = await clinicSupabase
-    .from('clinics')
-    .select('clinic_name, is_active')
-    .eq('profile_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (
-    profileError ||
-    clinicError ||
-    profile?.role !== 'clinic' ||
-    !clinic?.is_active
-  ) {
-    throw new Error(
-      profile?.role === 'clinic'
-        ? 'This clinic account has not been activated yet.'
-        : 'This account is not authorized for clinic access.',
-    );
+  if (profileError) {
+    throw new Error('Unable to verify clinic access. Please try again.');
   }
 
-  return { clinicName: clinic.clinic_name };
+  if (profile?.role !== 'clinic') {
+    throw new Error('This account is not authorized for clinic access.');
+  }
+
+  let context: ClinicActivationContext | null = null;
+  try {
+    context = await loadClinicActivationContext(client, user);
+  } catch {
+    // Missing or ineligible activation context is classified below.
+  }
+
+  const classification = classifyClinicAccess({
+    profileRole: profile.role,
+    userEmail: user.email,
+    context: context
+      ? {
+          officialEmail: context.officialEmail,
+          isActive: context.isActive,
+          activatedAt: context.activatedAt,
+          activationCompletedAt: context.activationCompletedAt,
+        }
+      : null,
+  });
+
+  if (classification === 'active' && context) {
+    return {
+      status: 'active',
+      clinic: { clinicName: context.clinicName },
+    };
+  }
+
+  if (classification === 'activation_incomplete' && context) {
+    return {
+      status: 'activation_incomplete',
+      clinic: {
+        clinicName: context.clinicName,
+        officialEmail: context.officialEmail,
+      },
+    };
+  }
+
+  throw new Error(clinicAccessErrorMessage(classification));
 }
 
-export async function restoreClinicSession(): Promise<AuthenticatedClinic | null> {
+export async function restoreClinicSession(): Promise<ClinicSessionInspection> {
   const { data: sessionData, error: sessionError } =
     await clinicSupabase.auth.getSession();
 
   if (sessionError) {
     await clinicSupabase.auth.signOut();
-    return null;
+    return { status: 'none' };
   }
 
   if (!sessionData.session) {
-    return null;
+    return { status: 'none' };
   }
 
   const { data: userData, error: userError } = await clinicSupabase.auth.getUser();
   if (userError || !userData.user) {
     await clinicSupabase.auth.signOut();
-    return null;
+    return { status: 'none' };
   }
 
   try {
-    return await validateAuthenticatedClinic(userData.user);
+    return await inspectAuthenticatedClinic(clinicSupabase, userData.user);
   } catch {
     await clinicSupabase.auth.signOut();
-    return null;
+    return { status: 'none' };
   }
 }
 
 export async function signInClinic(
   email: string,
   password: string,
-): Promise<AuthenticatedClinic> {
+): Promise<ClinicSessionInspection> {
   const { data, error } = await clinicSupabase.auth.signInWithPassword({
     email: email.trim(),
     password,
@@ -405,7 +526,7 @@ export async function signInClinic(
   }
 
   try {
-    return await validateAuthenticatedClinic(data.user);
+    return await inspectAuthenticatedClinic(clinicSupabase, data.user);
   } catch (validationError) {
     await clinicSupabase.auth.signOut();
     throw validationError;

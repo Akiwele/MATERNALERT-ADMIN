@@ -11,6 +11,7 @@ import { ApprovedClinics } from './pages/ApprovedClinics';
 import { ClinicAccountActivation } from './pages/ClinicAccountActivation';
 import { ClinicHome } from './pages/ClinicHome';
 import { ClinicLogin } from './pages/ClinicLogin';
+import { ClinicResumeActivation } from './pages/ClinicResumeActivation';
 import { Dashboard } from './pages/Dashboard';
 import { HospitalApplicationForm } from './pages/HospitalApplicationForm';
 import { PendingApplications } from './pages/PendingApplications';
@@ -27,6 +28,7 @@ function AppContent() {
 
         <Route element={<ClinicProviders />}>
           <Route path="/clinic-login" element={<ClinicLogin />} />
+          <Route path="/clinic/resume-activation" element={<ClinicResumeActivation />} />
           <Route element={<ClinicProtectedRoute />}>
             <Route path="/clinic" element={<ClinicHome />} />
           </Route>

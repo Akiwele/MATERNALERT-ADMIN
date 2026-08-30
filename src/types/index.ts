@@ -4,6 +4,8 @@ export type AccountStatus = 'Pending Activation' | 'Active' | 'Inactive';
 
 export type ActivationStatus = 'Link Sent' | 'Activated' | 'Not Sent';
 
+export type RejectionEmailStatus = 'processing' | 'sent' | 'failed';
+
 export type ClinicApplication = {
   id: string;
   facilityName: string;
@@ -26,7 +28,9 @@ export type ClinicApplication = {
   reviewNotes?: string;
   rejectionReason?: string;
   invitationSentAt?: string;
+  lastInvitationSentAt?: string;
   activationCompletedAt?: string;
+  rejectionEmailStatus?: RejectionEmailStatus;
   activationToken?: string;
   accountStatus?: AccountStatus;
   activationStatus?: ActivationStatus;

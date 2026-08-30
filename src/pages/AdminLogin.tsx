@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { AuthTextField } from '../components/auth/AuthTextField';
+import { MaternAlertBrand } from '../components/MaternAlertBrand';
 import { useApp } from '../context/AppContext';
 
 function AdminLoginBrandPanel() {
@@ -12,10 +13,12 @@ function AdminLoginBrandPanel() {
       <div className="admin-login-brand-glow" aria-hidden="true" />
 
       <div className="admin-login-brand-content">
-        <img
-          src="/maternalert-logo.png"
-          alt="MaternAlert"
-          className="admin-login-brand-logo"
+        <MaternAlertBrand
+          layout="stacked"
+          size="lg"
+          badge="Admin"
+          tone="light"
+          logoClassName="admin-login-brand-logo"
         />
         <div>
           <h2 className="admin-login-brand-title">Welcome to MaternAlert Admin</h2>

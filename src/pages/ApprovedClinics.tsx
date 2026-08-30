@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { ApprovedClinicDetails, formatDate } from '../components/ApplicationDetails';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
+import {
+  canShowActivationResend,
+  getActivationResendCooldownMs,
+  resendClinicInvitation,
+} from '../lib/clinicApplications';
 import type { ClinicApplication } from '../types';
 
 export function ApprovedClinics() {
@@ -15,8 +22,15 @@ export function ApprovedClinics() {
     applicationsError,
     refreshApplications,
   } = useApp();
+  const { showToast } = useToast();
   const [selected, setSelected] = useState<ClinicApplication | null>(null);
+  const [resendConfirmOpen, setResendConfirmOpen] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const resendInFlight = useRef(false);
   const approved = applications.filter((item) => item.status === 'approved');
+  const canResend = selected ? canShowActivationResend(selected) : false;
+  const cooldownMs = selected ? getActivationResendCooldownMs(selected.lastInvitationSentAt) : 0;
+  const cooldownMinutes = Math.ceil(cooldownMs / 60000);
 
   return (
     <div>
@@ -52,11 +66,33 @@ export function ApprovedClinics() {
       <Modal
         open={Boolean(selected)}
         title="Approved Clinic Details"
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          if (!isResending) {
+            setSelected(null);
+          }
+        }}
         footer={
-          <Button variant="secondary" onClick={() => setSelected(null)}>
-            Close
-          </Button>
+          selected ? (
+            <>
+              {canResend ? (
+                <Button
+                  disabled={isResending || cooldownMs > 0}
+                  onClick={() => setResendConfirmOpen(true)}
+                >
+                  {cooldownMs > 0
+                    ? `Resend available in ${cooldownMinutes} min`
+                    : 'Resend Activation Link'}
+                </Button>
+              ) : null}
+              <Button
+                variant="secondary"
+                disabled={isResending}
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </Button>
+            </>
+          ) : null
         }
       >
         {selected ? (
@@ -66,6 +102,53 @@ export function ApprovedClinics() {
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={resendConfirmOpen}
+        title="Resend Activation Link"
+        message={
+          selected
+            ? `Send a new 1-hour activation link to ${selected.officialEmail}?`
+            : 'Send a new 1-hour activation link?'
+        }
+        confirmLabel={isResending ? 'Sending...' : 'Send Link'}
+        isProcessing={isResending}
+        onConfirm={async () => {
+          if (!selected || resendInFlight.current) {
+            return;
+          }
+
+          resendInFlight.current = true;
+          setIsResending(true);
+
+          try {
+            const result = await resendClinicInvitation(selected.id);
+            await refreshApplications();
+            setSelected((current) =>
+              current
+                ? { ...current, lastInvitationSentAt: new Date().toISOString() }
+                : current,
+            );
+            setResendConfirmOpen(false);
+            showToast(result.message);
+          } catch (error) {
+            showToast(
+              error instanceof Error
+                ? error.message
+                : 'Unable to resend the clinic activation link.',
+              'error',
+            );
+          } finally {
+            resendInFlight.current = false;
+            setIsResending(false);
+          }
+        }}
+        onCancel={() => {
+          if (!isResending) {
+            setResendConfirmOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }

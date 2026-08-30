@@ -4,14 +4,24 @@ import type {
   ActivationStatus,
   ApplicationStatus,
   ClinicApplication,
+  RejectionEmailStatus,
 } from '../types';
+
+export const ACTIVATION_RESEND_COOLDOWN_MS = 15 * 60 * 1000;
 
 type ClinicOnboardingRow = {
   application_id: string;
   review_status: string;
   invitation_sent_at: string | null;
+  last_invitation_sent_at: string | null;
   activation_completed_at: string | null;
   clinic_is_active: boolean;
+};
+
+type RejectionEmailStatusRow = {
+  application_id: string;
+  email_status: string;
+  sent_at: string | null;
 };
 
 type ClinicApplicationDetailRow = {
@@ -33,14 +43,6 @@ type ClinicApplicationDetailRow = {
   reviewed_by: string | null;
   submitted_at: string;
   reviewed_at: string | null;
-};
-
-export type ClinicApplicationDecision = {
-  applicationId: string;
-  status: ApplicationStatus;
-  reviewedAt: string;
-  reviewedBy: string;
-  reviewNotes?: string;
 };
 
 function mapStatus(value: string): ApplicationStatus {
@@ -75,9 +77,18 @@ function getDocumentName(path: string | null) {
   return path.split('/').filter(Boolean).at(-1) ?? 'Licence document';
 }
 
+function mapRejectionEmailStatus(value: string | undefined): RejectionEmailStatus | undefined {
+  if (value === 'processing' || value === 'sent' || value === 'failed') {
+    return value;
+  }
+
+  return undefined;
+}
+
 function mapApplication(
   detail: ClinicApplicationDetailRow,
   onboarding: ClinicOnboardingRow,
+  rejectionEmailStatus?: RejectionEmailStatus,
 ): ClinicApplication {
   const status = mapStatus(detail.application_status);
   const licenceDocumentPath =
@@ -107,7 +118,9 @@ function mapApplication(
     reviewNotes: detail.review_notes ?? undefined,
     rejectionReason: status === 'rejected' ? detail.review_notes ?? undefined : undefined,
     invitationSentAt: onboarding.invitation_sent_at ?? undefined,
+    lastInvitationSentAt: onboarding.last_invitation_sent_at ?? undefined,
     activationCompletedAt: onboarding.activation_completed_at ?? undefined,
+    rejectionEmailStatus,
     accountStatus: mapAccountStatus(onboarding),
     activationStatus: mapActivationStatus(onboarding),
   };
@@ -123,6 +136,20 @@ export async function listClinicApplications(): Promise<ClinicApplication[]> {
   }
 
   const onboardingRows = (onboardingData ?? []) as ClinicOnboardingRow[];
+  const emailStatusByApplicationId = new Map<string, RejectionEmailStatus>();
+
+  const { data: emailStatusData, error: emailStatusError } = await supabase.rpc(
+    'list_clinic_application_rejection_email_statuses',
+  );
+
+  if (!emailStatusError) {
+    for (const row of (emailStatusData ?? []) as RejectionEmailStatusRow[]) {
+      const status = mapRejectionEmailStatus(row.email_status);
+      if (status) {
+        emailStatusByApplicationId.set(row.application_id, status);
+      }
+    }
+  }
 
   return Promise.all(
     onboardingRows.map(async (onboarding) => {
@@ -140,18 +167,14 @@ export async function listClinicApplications(): Promise<ClinicApplication[]> {
         throw new Error(`Clinic application ${onboarding.application_id} was not found.`);
       }
 
-      return mapApplication(detail, onboarding);
+      return mapApplication(
+        detail,
+        onboarding,
+        emailStatusByApplicationId.get(onboarding.application_id),
+      );
     }),
   );
 }
-
-type ClinicApplicationDecisionRow = {
-  application_id: string;
-  application_status: string;
-  reviewed_at: string;
-  reviewed_by: string;
-  review_notes: string | null;
-};
 
 function getErrorMessage(error: unknown) {
   if (
@@ -164,34 +187,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return String(error);
-}
-
-function getDecisionErrorMessage(error: unknown, action: 'approve' | 'reject') {
-  const message = getErrorMessage(error);
-  const normalizedMessage = message.toLowerCase();
-  const expectedMessages = [
-    'authentication is required',
-    'only administrators',
-    'clinic application not found',
-    'only pending clinic applications',
-    'a rejection reason is required',
-  ];
-
-  if (expectedMessages.some((expectedMessage) => normalizedMessage.includes(expectedMessage))) {
-    return message;
-  }
-
-  return `Unable to ${action} this clinic application. Please try again.`;
-}
-
-function mapDecision(row: ClinicApplicationDecisionRow): ClinicApplicationDecision {
-  return {
-    applicationId: row.application_id,
-    status: mapStatus(row.application_status),
-    reviewedAt: row.reviewed_at,
-    reviewedBy: row.reviewed_by,
-    reviewNotes: row.review_notes ?? undefined,
-  };
 }
 
 export type ClinicProvisioningResult = {
@@ -258,30 +253,177 @@ export async function approveClinicApplication(
   };
 }
 
+export type ClinicRejectionResult = {
+  applicationId: string;
+  applicationRejected: boolean;
+  emailSent: boolean;
+  emailAlreadySent: boolean;
+  message: string;
+};
+
+type ClinicRejectionResponse = {
+  success?: boolean;
+  message?: string;
+  application_id?: string;
+  application_rejected?: boolean;
+  email_sent?: boolean;
+  email_already_sent?: boolean;
+};
+
+export type ClinicInvitationResendResult = {
+  applicationId: string;
+  email: string;
+  message: string;
+};
+
+function canResendActivationLink(application: Pick<
+  ClinicApplication,
+  'status' | 'activationCompletedAt' | 'accountStatus'
+>): boolean {
+  return (
+    application.status === 'approved' &&
+    !application.activationCompletedAt &&
+    application.accountStatus !== 'Active'
+  );
+}
+
+export function getActivationResendCooldownMs(
+  lastInvitationSentAt?: string,
+  now = Date.now(),
+): number {
+  if (!lastInvitationSentAt) {
+    return 0;
+  }
+
+  const elapsed = now - new Date(lastInvitationSentAt).getTime();
+  if (!Number.isFinite(elapsed)) {
+    return 0;
+  }
+
+  return Math.max(0, ACTIVATION_RESEND_COOLDOWN_MS - elapsed);
+}
+
+export function canShowActivationResend(application: ClinicApplication): boolean {
+  return canResendActivationLink(application);
+}
+
+export function getRejectionEmailStatusLabel(status?: RejectionEmailStatus): string {
+  if (status === 'sent') {
+    return 'Rejected and email sent';
+  }
+
+  if (status === 'failed') {
+    return 'Rejected but email failed';
+  }
+
+  if (status === 'processing') {
+    return 'Rejection email is sending';
+  }
+
+  return 'Rejection email not sent';
+}
+
+export async function resendClinicInvitation(
+  applicationId: string,
+): Promise<ClinicInvitationResendResult> {
+  const { data, error } = await supabase.functions.invoke('resend-clinic-invitation', {
+    body: { application_id: applicationId },
+  });
+
+  if (error) {
+    throw new Error(
+      await getFunctionErrorMessage(
+        error,
+        'Unable to resend the clinic activation link. Please try again.',
+      ),
+    );
+  }
+
+  const result = data as {
+    success?: boolean;
+    application_id?: string;
+    email?: string;
+    message?: string;
+  } | null;
+
+  if (
+    !result ||
+    result.success !== true ||
+    typeof result.application_id !== 'string' ||
+    typeof result.email !== 'string' ||
+    typeof result.message !== 'string'
+  ) {
+    throw new Error('The clinic invitation service returned an invalid result.');
+  }
+
+  return {
+    applicationId: result.application_id,
+    email: result.email,
+    message: result.message,
+  };
+}
+
+async function invokeClinicRejection(
+  applicationId: string,
+  body: { rejection_reason?: string; retry_email?: boolean },
+  fallback: string,
+): Promise<ClinicRejectionResult> {
+  const { data, error } = await supabase.functions.invoke('reject-clinic-application', {
+    body: {
+      application_id: applicationId,
+      ...body,
+    },
+  });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, fallback));
+  }
+
+  const result = data as ClinicRejectionResponse | null;
+  if (
+    !result ||
+    result.success !== true ||
+    typeof result.application_id !== 'string' ||
+    typeof result.message !== 'string' ||
+    result.application_rejected !== true ||
+    typeof result.email_sent !== 'boolean'
+  ) {
+    throw new Error(fallback);
+  }
+
+  return {
+    applicationId: result.application_id,
+    applicationRejected: true,
+    emailSent: result.email_sent,
+    emailAlreadySent: result.email_already_sent === true,
+    message: result.message,
+  };
+}
+
 export async function rejectClinicApplication(
   applicationId: string,
   reason: string,
-): Promise<ClinicApplicationDecision> {
+): Promise<ClinicRejectionResult> {
   const rejectionReason = reason.trim();
   if (!rejectionReason) {
     throw new Error('A rejection reason is required.');
   }
 
-  const { data, error } = await supabase.rpc('reject_clinic_application', {
-    p_application_id: applicationId,
-    p_rejection_reason: rejectionReason,
-  });
+  return invokeClinicRejection(
+    applicationId,
+    { rejection_reason: rejectionReason },
+    'Unable to reject this clinic application. Please try again.',
+  );
+}
 
-  if (error) {
-    throw new Error(getDecisionErrorMessage(error, 'reject'));
-  }
-
-  const decision = (data as ClinicApplicationDecisionRow[] | null)?.[0];
-  if (!decision) {
-    throw new Error('The rejection completed without returning an application decision.');
-  }
-
-  return mapDecision(decision);
+export async function retryClinicRejectionEmail(
+  applicationId: string,
+): Promise<ClinicRejectionResult> {
+  return invokeClinicRejection(
+    applicationId,
+    { retry_email: true },
+    'Unable to send the rejection email. Please try again.',
+  );
 }
 
 type FunctionErrorResponse = {

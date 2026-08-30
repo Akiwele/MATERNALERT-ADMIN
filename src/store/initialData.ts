@@ -3,10 +3,24 @@ import type { ClinicApplication, SystemLog } from '../types';
 export const APPLICATION_FACILITY_TYPES = [
   'CHPS Compound',
   'Health Centre',
-  'Clinic',
+  'Maternity Home',
+  'Polyclinic',
+  'Private Clinic',
   'District Hospital',
   'Regional Hospital',
   'Teaching Hospital',
+  'Specialist Hospital',
+  'Mission/Faith-Based Hospital',
+  'Other',
+] as const;
+
+export const REPRESENTATIVE_POSITIONS = [
+  'Medical Superintendent',
+  'Medical Director',
+  'Midwife in Charge',
+  'Nurse in Charge',
+  'Facility Administrator',
+  'Facility Manager',
   'Other',
 ] as const;
 
@@ -17,25 +31,6 @@ export const FACILITY_TYPES = [
   'Health Centre',
   'Maternity Home',
   'CHPS Compound',
-] as const;
-
-export const GHANA_REGIONS = [
-  'Greater Accra',
-  'Ashanti',
-  'Western',
-  'Central',
-  'Eastern',
-  'Northern',
-  'Upper East',
-  'Upper West',
-  'Volta',
-  'Bono',
-  'Bono East',
-  'Ahafo',
-  'Western North',
-  'Oti',
-  'North East',
-  'Savannah',
 ] as const;
 
 type PendingClinicSeed = Omit<
