@@ -309,11 +309,7 @@ export function canShowActivationResend(application: ClinicApplication): boolean
 
 export function getRejectionEmailStatusLabel(status?: RejectionEmailStatus): string {
   if (status === 'sent') {
-    return 'Rejected and email sent';
-  }
-
-  if (status === 'failed') {
-    return 'Rejected but email failed';
+    return 'Rejection email sent';
   }
 
   if (status === 'processing') {

@@ -1,4 +1,5 @@
 import { SupportingDocumentsSection } from './SupportingDocumentsSection';
+import { getRejectionEmailStatusLabel } from '../lib/clinicApplications';
 import { brand } from '../theme/brand';
 import type { ClinicApplication } from '../types';
 
@@ -128,15 +129,7 @@ export function RejectedClinicDetails({ application }: RejectedClinicDetailsProp
       />
       <DetailField
         label="Email Status"
-        value={
-          application.rejectionEmailStatus === 'sent'
-            ? 'Rejected and email sent'
-            : application.rejectionEmailStatus === 'failed'
-              ? 'Rejected but email failed'
-              : application.rejectionEmailStatus === 'processing'
-                ? 'Rejection email is sending'
-                : 'Rejection email not sent'
-        }
+        value={getRejectionEmailStatusLabel(application.rejectionEmailStatus)}
       />
     </div>
   );
