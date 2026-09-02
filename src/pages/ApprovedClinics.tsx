@@ -108,8 +108,8 @@ export function ApprovedClinics() {
         title="Resend Activation Link"
         message={
           selected
-            ? `Send a new 1-hour activation link to ${selected.officialEmail}?`
-            : 'Send a new 1-hour activation link?'
+            ? `Send a new activation link to ${selected.officialEmail}?`
+            : 'Send a new activation link?'
         }
         confirmLabel={isResending ? 'Sending...' : 'Send Link'}
         isProcessing={isResending}

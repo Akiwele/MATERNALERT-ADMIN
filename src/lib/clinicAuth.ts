@@ -400,6 +400,13 @@ export async function activateClinicAccount(password: string): Promise<void> {
     throw new Error(passwordError.message);
   }
 
+  const { error: markerError } = await supabase.rpc('mark_clinic_password_setup_completed');
+  if (markerError) {
+    throw new ClinicActivationRpcError(
+      'Your password was saved, but clinic activation could not be completed. Use Retry Activation to finish without creating another password.',
+    );
+  }
+
   console.log('Clinic activation: calling activation RPC');
   try {
     await completeClinicActivationWith(supabase);
@@ -418,6 +425,13 @@ export async function retryClinicAccountActivation(): Promise<void> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session) {
     throw lostInvitationSessionError();
+  }
+
+  const { error: markerError } = await supabase.rpc('mark_clinic_password_setup_completed');
+  if (markerError) {
+    throw new ClinicActivationRpcError(
+      'Your password was saved, but clinic activation could not be completed. Use Retry Activation to finish without creating another password.',
+    );
   }
 
   await completeClinicActivationWith(supabase);

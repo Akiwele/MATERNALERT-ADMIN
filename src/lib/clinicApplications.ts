@@ -7,7 +7,7 @@ import type {
   RejectionEmailStatus,
 } from '../types';
 
-export const ACTIVATION_RESEND_COOLDOWN_MS = 15 * 60 * 1000;
+export const ACTIVATION_RESEND_COOLDOWN_MS = 5 * 60 * 1000;
 
 type ClinicOnboardingRow = {
   application_id: string;
@@ -326,21 +326,30 @@ export async function resendClinicInvitation(
     body: { application_id: applicationId },
   });
 
-  if (error) {
-    throw new Error(
-      await getFunctionErrorMessage(
-        error,
-        'Unable to resend the clinic activation link. Please try again.',
-      ),
-    );
-  }
-
   const result = data as {
     success?: boolean;
     application_id?: string;
     email?: string;
     message?: string;
   } | null;
+  const backendMessage =
+    typeof result?.message === 'string' && result.message.trim()
+      ? result.message.trim()
+      : null;
+
+  if (error) {
+    throw new Error(
+      backendMessage ??
+        (await getFunctionErrorMessage(
+          error,
+          'Unable to resend the clinic activation link. Please try again.',
+        )),
+    );
+  }
+
+  if (result?.success === false && backendMessage) {
+    throw new Error(backendMessage);
+  }
 
   if (
     !result ||
